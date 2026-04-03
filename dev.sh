@@ -3,8 +3,8 @@
 
 set -e
 
-ADDON_NAME="example"
-ADDON_PATH="./example"
+ADDON_NAME="WLEDMatrixManager"
+ADDON_PATH="./WLEDMatrixManager"
 
 echo "🏠 Home Assistant Add-on Development Helper"
 echo "==========================================="

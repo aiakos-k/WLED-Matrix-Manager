@@ -1,0 +1,10 @@
+nohup: Eingabe wird ignoriert
+ * Serving Flask app 'flask_module.app'
+ * Debug mode: on
+[2025-11-09 14:20:27,853] INFO in _internal: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+[2025-11-09 14:20:27,853] INFO in _internal: [33mPress CTRL+C to quit[0m
+[2025-11-09 14:20:27,853] INFO in _internal:  * Restarting with stat
+[2025-11-09 14:20:28,303] WARNING in _internal:  * Debugger is active!
+[2025-11-09 14:20:28,304] INFO in _internal:  * Debugger PIN: 739-256-201
+[2025-11-09 14:20:33,365] INFO in _internal: 127.0.0.1 - - [09/Nov/2025 14:20:33] "GET /api/users HTTP/1.1" 200 -

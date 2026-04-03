@@ -21,9 +21,9 @@ fi
 
 # Install backend dependencies if Python is available
 if command -v python3 &> /dev/null; then
-  if [ ! -d "example/backend/venv" ]; then
+  if [ ! -d "WLEDMatrixManager/backend/venv" ]; then
     echo "📦 Installing backend dependencies..."
-    cd example/backend
+    cd WLEDMatrixManager/backend
     python3 -m venv venv --system-site-packages || true
     source venv/bin/activate || . ./venv/bin/activate
     pip install -U pip setuptools wheel
@@ -35,9 +35,9 @@ fi
 
 # Install frontend dependencies
 if command -v npm &> /dev/null || command -v npm &> /dev/null; then
-  if [ ! -d "example/frontend/node_modules" ]; then
+  if [ ! -d "WLEDMatrixManager/frontend/node_modules" ]; then
     echo "📦 Installing frontend dependencies..."
-    cd example/frontend
+    cd WLEDMatrixManager/frontend
     npm install
     cd ../..
   fi

@@ -80,7 +80,7 @@ build_docker() {
   echo -e "${YELLOW}🐳 Building Docker image...${NC}"
   docker build \
     --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.15 \
-    -t addon_example:latest \
+    -t addon_wledmatrixmanager:latest \
     "$ADDON_PATH"
   echo -e "${GREEN}✅ Docker image built${NC}"
 }

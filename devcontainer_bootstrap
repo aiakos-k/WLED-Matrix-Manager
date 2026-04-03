@@ -103,14 +103,16 @@ else:
 path = '/usr/src/supervisor/supervisor/api/supervisor.py'
 with open(path, 'r') as f:
     content = f.read()
-old = '            await self.sys_dbus.agent.set_diagnostics(body[ATTR_DIAGNOSTICS])'
-new = '''            try:
-                await self.sys_dbus.agent.set_diagnostics(body[ATTR_DIAGNOSTICS])
-            except Exception:
-                pass'''
+old = '        if ATTR_DIAGNOSTICS in body:\n            self.sys_config.diagnostics = body[ATTR_DIAGNOSTICS]\n            await self.sys_dbus.agent.set_diagnostics(body[ATTR_DIAGNOSTICS])\n\n            if body[ATTR_DIAGNOSTICS]:\n                init_sentry(self.coresys)\n            else:\n                close_sentry()'
+new = '        if ATTR_DIAGNOSTICS in body:\n            self.sys_config.diagnostics = body[ATTR_DIAGNOSTICS]\n            try:\n                await self.sys_dbus.agent.set_diagnostics(body[ATTR_DIAGNOSTICS])\n            except Exception:\n                pass\n\n            if body[ATTR_DIAGNOSTICS]:\n                init_sentry(self.coresys)\n            else:\n                close_sentry()'
 if old in content:
     with open(path, 'w') as f:
         f.write(content.replace(old, new))
+    print('patched')
+elif 'except Exception' in content and 'set_diagnostics' in content:
+    print('already patched')
+else:
+    print('pattern not found')
 " 2>/dev/null && echo "  ✅ Diagnostics patch applied" || echo "  ⚠️  Diagnostics patch skipped"
 
   # Copy apparmor_parser into supervisor container

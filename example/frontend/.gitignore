@@ -1,0 +1,11 @@
+.env.local
+.env.*.local
+dist/
+node_modules/
+npm-debug.log
+yarn-error.log
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode-settings.json

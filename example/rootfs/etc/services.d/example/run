@@ -1,0 +1,26 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Home Assistant Add-on Service Start
+# ==============================================================================
+# FastAPI backend server that communicates with Home Assistant
+# https://developers.home-assistant.io/docs/add-ons/
+# ==============================================================================
+
+# Declare variables
+declare log_level
+
+## Get log level from config
+log_level=$(bashio::config 'log_level')
+
+## Set Python environment
+export PYTHONUNBUFFERED=1
+export LOG_LEVEL="${log_level:=info}"
+
+bashio::log.info "Starting Home Assistant Add-on..."
+bashio::log.info "Log level: ${LOG_LEVEL}"
+
+## Change to app directory
+cd /app/backend
+
+## Run FastAPI application
+exec python3 main.py

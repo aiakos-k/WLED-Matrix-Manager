@@ -1,0 +1,152 @@
+#!/bin/bash
+# DevContainer Bootstrap Script for Home Assistant Add-on Development
+
+set -e
+
+echo "🏠 Initializing Home Assistant Development Container..."
+
+# Create dummy apparmor_parser (not available in DevContainer)
+if ! command -v apparmor_parser &> /dev/null; then
+  printf '#!/bin/bash\nexit 0\n' > /usr/local/bin/apparmor_parser
+  chmod +x /usr/local/bin/apparmor_parser
+fi
+
+# Check if Python is available
+if ! command -v python3 &> /dev/null; then
+  echo "⚠️  Python3 not found in PATH. Trying to locate..."
+  if [ -f "/usr/local/bin/python3" ]; then
+    export PATH="/usr/local/bin:$PATH"
+  fi
+fi
+
+# Install backend dependencies if Python is available
+if command -v python3 &> /dev/null; then
+  if [ ! -d "example/backend/venv" ]; then
+    echo "📦 Installing backend dependencies..."
+    cd example/backend
+    python3 -m venv venv --system-site-packages || true
+    source venv/bin/activate || . ./venv/bin/activate
+    pip install -U pip setuptools wheel
+    pip install -r requirements.txt
+    deactivate || true
+    cd ../..
+  fi
+fi
+
+# Install frontend dependencies
+if command -v npm &> /dev/null || command -v npm &> /dev/null; then
+  if [ ! -d "example/frontend/node_modules" ]; then
+    echo "📦 Installing frontend dependencies..."
+    cd example/frontend
+    npm install
+    cd ../..
+  fi
+fi
+
+# Try to start Home Assistant Supervisor if Docker is available
+if command -v docker &> /dev/null; then
+  echo "🚀 Starting Home Assistant Supervisor..."
+  if timeout 10 ha supervisor start > /tmp/ha_supervisor.log 2>&1 &
+  then
+    HA_PID=$!
+    sleep 3
+    if ps -p $HA_PID > /dev/null 2>&1; then
+      echo "✅ Home Assistant Supervisor started (PID: $HA_PID)"
+    fi
+  fi
+fi
+
+# Apply DevContainer-specific patches to Supervisor
+# These are needed because the DevContainer lacks systemd, dbus, os-agent
+patch_supervisor() {
+  local max_retries=30
+  local i=0
+  # Wait for supervisor container to be running
+  while [ $i -lt $max_retries ]; do
+    if docker inspect hassio_supervisor &>/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+    i=$((i + 1))
+  done
+
+  if ! docker inspect hassio_supervisor &>/dev/null 2>&1; then
+    echo "⚠️  Supervisor container not found, skipping patches"
+    return
+  fi
+
+  echo "🔧 Applying DevContainer patches to Supervisor..."
+
+  # Patch 1: Skip gateway firewall check (requires systemd/dbus)
+  # Uses regex to handle different supervisor versions (with/without sys_dev check)
+  docker exec hassio_supervisor python3 -c "
+import re
+path = '/usr/src/supervisor/supervisor/host/firewall.py'
+with open(path, 'r') as f:
+    content = f.read()
+# Match the public apply_gateway_firewall_rules method regardless of body
+pattern = r'(    async def apply_gateway_firewall_rules\(self\) -> None:\n        \"\"\"[^\"]*\"\"\"\n)(.*?)(?=\n    async def |\n    def |\nclass |\Z)'
+replacement = r'''\1        _LOGGER.info(\"Gateway firewall rules skipped (DevContainer)\")\n'''
+new_content, count = re.subn(pattern, replacement, content, flags=re.DOTALL)
+if count > 0 and 'skipped (DevContainer)' not in content:
+    with open(path, 'w') as f:
+        f.write(new_content)
+    print('patched')
+elif 'skipped (DevContainer)' in content:
+    print('already patched')
+else:
+    print('pattern not found')
+" 2>/dev/null && echo "  ✅ Firewall patch applied" || echo "  ⚠️  Firewall patch skipped"
+
+  # Patch 2: Skip dbus agent call for diagnostics (requires os-agent)
+  docker exec hassio_supervisor python3 -c "
+path = '/usr/src/supervisor/supervisor/api/supervisor.py'
+with open(path, 'r') as f:
+    content = f.read()
+old = '            await self.sys_dbus.agent.set_diagnostics(body[ATTR_DIAGNOSTICS])'
+new = '''            try:
+                await self.sys_dbus.agent.set_diagnostics(body[ATTR_DIAGNOSTICS])
+            except Exception:
+                pass'''
+if old in content:
+    with open(path, 'w') as f:
+        f.write(content.replace(old, new))
+" 2>/dev/null && echo "  ✅ Diagnostics patch applied" || echo "  ⚠️  Diagnostics patch skipped"
+
+  # Copy apparmor_parser into supervisor container
+  docker cp /usr/local/bin/apparmor_parser hassio_supervisor:/usr/sbin/apparmor_parser 2>/dev/null || true
+
+  # Restart supervisor to apply patches
+  echo "  🔄 Restarting Supervisor to apply patches..."
+  ha supervisor restart 2>/dev/null || true
+  sleep 10
+}
+
+# Monitor supervisor container and re-apply patches after restarts/updates
+monitor_supervisor() {
+  patch_supervisor
+  # Watch for supervisor container recreations
+  while true; do
+    docker events --filter "container=hassio_supervisor" --filter "event=start" --format "{{.Status}}" 2>/dev/null | while read -r event; do
+      echo "🔄 Supervisor container restarted, re-applying patches in 15s..."
+      sleep 15
+      patch_supervisor
+    done
+    sleep 30
+  done
+}
+
+# Run monitor in background so bootstrap completes quickly
+monitor_supervisor &
+
+echo ""
+echo "✅ DevContainer initialized!"
+echo ""
+echo "Available commands:"
+echo "  ./dev.sh setup          - Install all dependencies"
+echo "  ./dev.sh start:backend  - Start FastAPI server"
+echo "  ./dev.sh start:frontend - Start React dev server"
+echo "  ./dev.sh start:addon    - Build and start add-on"
+echo "  ./dev.sh logs           - View add-on logs"
+echo ""
+

@@ -1,7 +1,7 @@
 # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
-name: Example add-on
+name: WLED Matrix Manager
 version: "1.2.0"
-slug: example
+slug: wled_matrix_manager
 description: Modernes Home Assistant Add-on mit FastAPI Backend, React Frontend und WebSocket Integration
 url: "https://github.com/home-assistant/addons-example/tree/main/example"
 arch:
@@ -13,7 +13,7 @@ ingress: true
 ingress_port: 8000
 ingress_entry_point: /
 panel_icon: mdi:application
-panel_title: Example Dashboard
+panel_title: WLED Matrix Manager Dashboard
 ports:
   8000/tcp: 8000
 map:

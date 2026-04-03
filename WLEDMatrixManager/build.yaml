@@ -4,7 +4,7 @@ build_from:
   amd64: "ghcr.io/home-assistant/amd64-base:3.20"
 
 labels:
-  org.opencontainers.image.title: "Home Assistant Add-on: Example add-on"
+  org.opencontainers.image.title: "Home Assistant WLED Matrix Manager Add-on"
   org.opencontainers.image.description: "Modernes Home Assistant Add-on mit FastAPI Backend und React Frontend"
   org.opencontainers.image.source: "https://github.com/home-assistant/addons-example"
   org.opencontainers.image.licenses: "Apache License 2.0"

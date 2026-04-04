@@ -5,6 +5,12 @@ set -e
 
 echo "🏠 Initializing Home Assistant Development Container..."
 
+# Mark workspace as safe for git (ownership differs in DevContainer)
+git config --global --add safe.directory /mnt/supervisor/addons/local 2>/dev/null || true
+for dir in /mnt/supervisor/addons/local/*/; do
+  git config --global --add safe.directory "$dir" 2>/dev/null || true
+done
+
 # Create dummy apparmor_parser (not available in DevContainer)
 if ! command -v apparmor_parser &> /dev/null; then
   printf '#!/bin/bash\nexit 0\n' > /usr/local/bin/apparmor_parser

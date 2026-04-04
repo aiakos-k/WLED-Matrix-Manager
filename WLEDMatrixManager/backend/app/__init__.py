@@ -1,1 +1,1 @@
-"""Home Assistant Add-on API module"""
+"""WLED Matrix Manager — FastAPI backend"""

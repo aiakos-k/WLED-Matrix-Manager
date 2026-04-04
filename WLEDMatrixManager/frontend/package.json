@@ -1,5 +1,5 @@
 {
-  "name": "ha-addon-dashboard",
+  "name": "wled-matrix-manager",
   "private": true,
   "version": "1.2.0",
   "type": "module",
@@ -13,8 +13,9 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "axios": "^1.6.1",
-    "zustand": "^4.4.1"
+    "react-router-dom": "^6.20.0",
+    "antd": "^5.12.0",
+    "@ant-design/icons": "^5.2.6"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",

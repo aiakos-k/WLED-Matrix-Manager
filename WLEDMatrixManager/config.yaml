@@ -2,7 +2,7 @@
 name: WLED Matrix Manager
 version: "1.2.0"
 slug: wled_matrix_manager
-description: Modernes Home Assistant Add-on mit FastAPI Backend, React Frontend und WebSocket Integration
+description: Create and manage pixel-art scenes for WLED LED matrices
 url: "https://github.com/home-assistant/addons-example/tree/main/example"
 arch:
   - aarch64
@@ -12,12 +12,14 @@ apparmor: false
 ingress: true
 ingress_port: 8000
 ingress_entry_point: /
-panel_icon: mdi:application
-panel_title: WLED Matrix Manager Dashboard
+panel_icon: mdi:led-strip-variant
+panel_title: WLED Matrix Manager
+homeassistant_api: true
 ports:
   8000/tcp: 8000
 map:
   - share:rw
+  - addon_config:rw
 options:
   log_level: info
 schema:

@@ -1,41 +1,59 @@
-/**
- * Custom hook for WebSocket connection
- */
+import { useEffect, useRef, useCallback, useState } from "react";
 
-import { useEffect, useCallback } from 'react'
-import haClient from '@/api/client'
-import { useHAStore } from '@/store/ha'
+const isProd = import.meta.env.MODE === "production";
+const WS_URL = isProd
+  ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}${window.location.pathname.replace(/\/$/, "")}/ws`
+  : "ws://localhost:8000/ws";
 
-export function useWebSocket() {
-  const setConnected = useHAStore((state) => state.setConnected)
-  const setError = useHAStore((state) => state.setError)
-  const updateEntity = useHAStore((state) => state.updateEntity)
+type MessageHandler = (data: unknown) => void;
+
+export function useWebSocket(onMessage?: MessageHandler) {
+  const wsRef = useRef<WebSocket | null>(null);
+  const [connected, setConnected] = useState(false);
+  const reconnectRef = useRef(0);
+
+  const connect = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    const ws = new WebSocket(WS_URL);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setConnected(true);
+      reconnectRef.current = 0;
+    };
+    ws.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        onMessage?.(data);
+      } catch {
+        /* ignore */
+      }
+    };
+    ws.onerror = () => setConnected(false);
+    ws.onclose = () => {
+      setConnected(false);
+      if (reconnectRef.current < 5) {
+        const delay = Math.min(1000 * 2 ** reconnectRef.current, 30000);
+        reconnectRef.current++;
+        setTimeout(connect, delay);
+      }
+    };
+  }, [onMessage]);
 
   useEffect(() => {
-    const handleMessage = (data: any) => {
-      // Handle different message types from server
-      if (data.entity) {
-        updateEntity(data.entity)
-      }
-    }
-
-    const handleError = () => {
-      setConnected(false)
-      setError('WebSocket connection failed')
-    }
-
-    haClient.connect(handleMessage, handleError)
-    setConnected(true)
-
+    connect();
     return () => {
-      haClient.disconnect()
-      setConnected(false)
+      wsRef.current?.close();
+      wsRef.current = null;
+    };
+  }, [connect]);
+
+  const send = useCallback((data: unknown) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(data));
     }
-  }, [setConnected, setError, updateEntity])
+  }, []);
 
-  const sendMessage = useCallback((data: any) => {
-    haClient.send(data)
-  }, [])
-
-  return { sendMessage }
+  return { connected, send };
 }

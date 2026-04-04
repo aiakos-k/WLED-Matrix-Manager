@@ -7,7 +7,7 @@ FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 COPY frontend/ ./
 RUN npm run build
@@ -21,6 +21,8 @@ RUN \
     apk add --no-cache \
         python3 \
         py3-pip \
+        py3-pillow \
+        py3-numpy \
         curl \
     && \
     curl -sSLf -o /usr/bin/tempio \
@@ -35,6 +37,9 @@ RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 # Copy backend code
 COPY backend/ ./
 
+# Create data directory for SQLite
+RUN mkdir -p /data
+
 # Copy built frontend from stage 1
 COPY --from=frontend-build /app/frontend/dist ../frontend/dist
 
@@ -45,8 +50,8 @@ COPY rootfs /
 WORKDIR /app
 
 # Expose ports
-EXPOSE 8000 3000
+EXPOSE 8000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1

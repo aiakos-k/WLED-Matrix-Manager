@@ -16,13 +16,12 @@ panel_icon: mdi:led-strip-variant
 panel_title: WLED Matrix Manager
 homeassistant_api: true
 hassio_api: true
-services:
-  - mqtt:want
 ports:
   8000/tcp: 8000
 map:
   - share:rw
   - addon_config:rw
+  - homeassistant_config:rw
 options:
   log_level: info
 schema:

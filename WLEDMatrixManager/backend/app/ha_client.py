@@ -106,9 +106,7 @@ class HAClient:
                 "Core API proxy not accessible - trying to create ingress token"
             )
             # Try getting a short-lived token from Supervisor
-            token_resp = await self._supervisor_post(
-                "/auth/token", data=None
-            )
+            token_resp = await self._supervisor_post("/auth/token", data=None)
             if token_resp:
                 logger.info(f"Auth token response: {list(token_resp.keys())}")
 
@@ -207,9 +205,7 @@ class HAClient:
             logger.error(f"Supervisor GET {path}: {e}")
             return None
 
-    async def _supervisor_post(
-        self, path: str, data: Optional[Dict]
-    ) -> Optional[Dict]:
+    async def _supervisor_post(self, path: str, data: Optional[Dict]) -> Optional[Dict]:
         """POST to Supervisor API."""
         try:
             async with aiohttp.ClientSession() as session:
@@ -225,9 +221,7 @@ class HAClient:
                     if resp.status == 200:
                         return await resp.json()
                     body = await resp.text()
-                    logger.error(
-                        f"Supervisor POST {path}: {resp.status} {body[:200]}"
-                    )
+                    logger.error(f"Supervisor POST {path}: {resp.status} {body[:200]}")
                     return None
         except Exception as e:
             logger.error(f"Supervisor POST {path}: {e}")
@@ -243,16 +237,12 @@ class HAClient:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self._core_api_url}{path}",
-                    headers={
-                        "Authorization": f"Bearer {self.core_token}"
-                    },
+                    headers={"Authorization": f"Bearer {self.core_token}"},
                     timeout=aiohttp.ClientTimeout(total=10),
                 ) as resp:
                     if resp.status == 200:
                         return await resp.json()
-                    logger.error(
-                        f"Core GET {path}: {resp.status}"
-                    )
+                    logger.error(f"Core GET {path}: {resp.status}")
                     return None
         except Exception as e:
             logger.error(f"Core GET {path}: {e}")
@@ -267,7 +257,9 @@ class HAClient:
                     data = json.loads(msg.data)
                     msg_type = data.get("type")
                     if msg_type == "auth_required":
-                        logger.info(f"WS auth_required (HA {data.get('ha_version', '?')})")
+                        logger.info(
+                            f"WS auth_required (HA {data.get('ha_version', '?')})"
+                        )
                         await self._authenticate()
                     elif msg_type == "auth_ok":
                         self.authenticated = True
@@ -291,10 +283,12 @@ class HAClient:
     async def _authenticate(self):
         if self.ws:
             # Try SUPERVISOR_TOKEN first
-            await self.ws.send_json({
-                "type": "auth",
-                "access_token": self.auth_token,
-            })
+            await self.ws.send_json(
+                {
+                    "type": "auth",
+                    "access_token": self.auth_token,
+                }
+            )
 
     async def _send_ws(self, payload: dict) -> Optional[dict]:
         if not self.ws or not self.authenticated:
@@ -319,15 +313,25 @@ class HAClient:
         return result if isinstance(result, list) else []
 
     async def get_config_entries(self) -> List[Dict]:
-        # Try WS first (more detailed, has data.host)
+        # Try REST first, then WS
+        result = await self._core_get("/config/config_entries/entry")
+        if isinstance(result, list) and result:
+            return result
+
         if self.authenticated:
             resp = await self._send_ws({"type": "config_entries/get"})
             if resp and resp.get("success"):
                 return resp.get("result", [])
 
-        # Fallback to REST
-        result = await self._core_get("/config/config_entries/entry")
-        return result if isinstance(result, list) else []
+        return []
+
+    async def get_device_registry(self) -> List[Dict]:
+        """Get HA device registry (has configuration_url with IP for network devices)."""
+        if self.authenticated:
+            resp = await self._send_ws({"type": "config/device_registry/list"})
+            if resp and resp.get("success"):
+                return resp.get("result", [])
+        return []
 
     # --- WLED Discovery ---
 
@@ -337,7 +341,7 @@ class HAClient:
             f"ws={self.authenticated})"
         )
 
-        # Strategy 1: Config entries (best — has IP in data.host)
+        # Strategy 1: Config entries + device registry (best — has IP)
         entries = await self.get_config_entries()
         if entries:
             wled = [e for e in entries if e.get("domain") == "wled"]
@@ -345,28 +349,47 @@ class HAClient:
                 logger.info(f"Found {len(wled)} WLED config entries")
                 return await self._from_entries(wled)
 
-        # Strategy 2: Supervisor API — get HA config then states
-        # (hassio_api works, so try to get data through Supervisor)
-        devices = await self._discover_via_supervisor()
-        if devices:
-            return devices
-
-        # Strategy 3: Broad state scan
+        # Strategy 2: Broad state scan
         return await self._from_states()
+
+    async def _extract_ip(self, url: str) -> str:
+        """Extract IP/host from a URL like http://192.168.0.100."""
+        if not url:
+            return ""
+        # Strip protocol and trailing slashes/paths
+        host = url.split("://")[-1].split("/")[0].split(":")[0]
+        return host
 
     async def _from_entries(self, wled_entries: List[Dict]) -> List[Dict]:
         entries_map: Dict[str, Dict] = {}
         for e in wled_entries:
             eid = e.get("entry_id", "")
+            host = e.get("data", {}).get("host", "")
             entries_map[eid] = {
-                "host": e.get("data", {}).get("host", ""),
+                "host": host,
                 "title": e.get("title", ""),
             }
             logger.info(
-                f"  Entry: {e.get('title')} host={e.get('data', {}).get('host', '?')}"
+                f"  Config entry: {e.get('title')} entry_id={eid} host={host or '?'}"
             )
 
-        # Resolve entity IDs
+        # Get device registry to find configuration_url (contains IP)
+        dev_registry = await self.get_device_registry()
+        # Map config_entry_id -> configuration_url
+        entry_ip_map: Dict[str, str] = {}
+        for dev in dev_registry:
+            config_entries = dev.get("config_entries", [])
+            config_url = dev.get("configuration_url", "") or ""
+            for ce_id in config_entries:
+                if ce_id in entries_map and config_url:
+                    ip = await self._extract_ip(config_url)
+                    if ip:
+                        entry_ip_map[ce_id] = ip
+                        logger.info(
+                            f"  Device registry: {dev.get('name')} -> {config_url} (ip={ip})"
+                        )
+
+        # Resolve entity IDs from entity registry
         entity_map: Dict[str, str] = {}
         if self.authenticated:
             resp = await self._send_ws({"type": "config/entity_registry/list"})
@@ -385,35 +408,27 @@ class HAClient:
             eid = entity_map.get(entry_id, "")
             state = state_map.get(eid, {})
             attrs = state.get("attributes", {})
-            ip = info["host"] or attrs.get("ip_address", "") or ""
-            devices.append({
-                "entity_id": eid,
-                "name": attrs.get("friendly_name", info["title"]),
-                "ip_address": ip,
-                "state": state.get("state", "unknown"),
-                "attributes": attrs,
-            })
+            # IP priority: config entry data > device registry > entity attributes
+            ip = (
+                info["host"]
+                or entry_ip_map.get(entry_id, "")
+                or attrs.get("ip_address", "")
+                or ""
+            )
+            devices.append(
+                {
+                    "entity_id": eid,
+                    "name": attrs.get("friendly_name", info["title"]),
+                    "ip_address": ip,
+                    "state": state.get("state", "unknown"),
+                    "attributes": attrs,
+                }
+            )
+            logger.info(
+                f"  Result: {eid} name={attrs.get('friendly_name', info['title'])} ip={ip}"
+            )
         logger.info(f"Config entries -> {len(devices)} devices")
         return devices
-
-    async def _discover_via_supervisor(self) -> List[Dict]:
-        """Use the Supervisor API (which works) to discover WLED."""
-        # The Supervisor can proxy service calls
-        # Try getting HA services info
-        services = await self._supervisor_get("/services")
-        if services:
-            logger.info(f"Supervisor services: {list(services.get('data', {}).keys()) if isinstance(services.get('data'), dict) else '?'}")
-
-        # Try if Supervisor exposes any entity info
-        core_info = await self._supervisor_get("/core/info")
-        if core_info:
-            data = core_info.get("data", {})
-            logger.info(
-                f"Core info: version={data.get('version')}, "
-                f"state={data.get('state')}"
-            )
-
-        return []  # Supervisor doesn't expose entity data
 
     async def _from_states(self) -> List[Dict]:
         states = await self.get_states()
@@ -436,19 +451,24 @@ class HAClient:
                 is_wled = True
             elif isinstance(attrs.get("effect_list"), list):
                 effects = set(attrs["effect_list"])
-                if len({"Solid", "Blink", "Breathe", "Rainbow", "Fire 2012"} & effects) >= 3:
+                if (
+                    len({"Solid", "Blink", "Breathe", "Rainbow", "Fire 2012"} & effects)
+                    >= 3
+                ):
                     is_wled = True
 
             if is_wled and eid not in seen:
                 seen.add(eid)
                 ip = attrs.get("ip_address") or attrs.get("host", "")
-                devices.append({
-                    "entity_id": eid,
-                    "name": attrs.get("friendly_name", eid),
-                    "ip_address": ip,
-                    "state": entity.get("state", "unknown"),
-                    "attributes": attrs,
-                })
+                devices.append(
+                    {
+                        "entity_id": eid,
+                        "name": attrs.get("friendly_name", eid),
+                        "ip_address": ip,
+                        "state": entity.get("state", "unknown"),
+                        "attributes": attrs,
+                    }
+                )
                 logger.info(f"  Found: {eid} ip={ip}")
 
         logger.info(f"State scan: {len(devices)} WLED devices")
@@ -563,12 +583,14 @@ class HAClient:
         service = data.get("service")
         if not domain or not service:
             return {"error": "Missing domain/service"}
-        resp = await self._send_ws({
-            "type": "call_service",
-            "domain": domain,
-            "service": service,
-            "service_data": data.get("data", {}),
-        })
+        resp = await self._send_ws(
+            {
+                "type": "call_service",
+                "domain": domain,
+                "service": service,
+                "service_data": data.get("data", {}),
+            }
+        )
         if resp and resp.get("success"):
             return {"type": "result", "success": True}
         return {"type": "error", "message": "Service call failed"}

@@ -10,6 +10,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   createScene, getScene, updateScene, getDevices, playScene, stopScene,
+  testFrameOnDevice,
   type FrameData, type DeviceData, type SceneCreate,
 } from '@/api/client';
 import { parseWledJson } from '@/utils/wledParser';
@@ -149,19 +150,19 @@ const SceneEditor: React.FC = () => {
       ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
     }
 
-    // Grid
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 0.5;
+    // Grid – subtle lines between pixels for distinction
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
     for (let x = 0; x <= width; x++) {
       ctx.beginPath();
-      ctx.moveTo(x * cellSize, 0);
-      ctx.lineTo(x * cellSize, canvas.height);
+      ctx.moveTo(x * cellSize + 0.5, 0);
+      ctx.lineTo(x * cellSize + 0.5, canvas.height);
       ctx.stroke();
     }
     for (let y = 0; y <= height; y++) {
       ctx.beginPath();
-      ctx.moveTo(0, y * cellSize);
-      ctx.lineTo(canvas.width, y * cellSize);
+      ctx.moveTo(0, y * cellSize + 0.5);
+      ctx.lineTo(canvas.width, y * cellSize + 0.5);
       ctx.stroke();
     }
 
@@ -354,9 +355,10 @@ const SceneEditor: React.FC = () => {
   const handleImageUpload = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
+    const base = window.location.pathname.replace(/\/$/, '');
 
     try {
-      const resp = await fetch(`/api/image/convert?width=${width}&height=${height}&colors=256`, {
+      const resp = await fetch(`${base}/api/image/convert?width=${width}&height=${height}&colors=256`, {
         method: 'POST',
         body: formData,
       });
@@ -401,22 +403,19 @@ const SceneEditor: React.FC = () => {
       message.warning('Select a device first');
       return;
     }
-    // Create temporary scene and play
-    const tempScene: SceneCreate = {
-      name: '__temp_test__',
-      matrix_width: width,
-      matrix_height: height,
-      default_frame_duration: 5,
-      loop_mode: 'once',
-      device_ids: selectedDevices,
-      frames: [frames[currentFrame]],
-    };
+    const frame = frames[currentFrame];
     try {
-      const created = await createScene(tempScene);
-      await playScene(created.id, selectedDevices);
-      message.success('Test frame sent to device');
+      await testFrameOnDevice({
+        device_ids: selectedDevices,
+        pixel_data: frame.pixel_data,
+        brightness: frame.brightness,
+        color_r: frame.color_r,
+        color_g: frame.color_g,
+        color_b: frame.color_b,
+      });
+      message.success('Frame sent to device');
     } catch {
-      message.error('Failed to test frame');
+      message.error('Failed to send frame to device');
     }
   };
 
@@ -485,7 +484,7 @@ const SceneEditor: React.FC = () => {
           <h2 style={{ margin: 0 }}>{isEdit ? 'Edit Scene' : 'Create Scene'}</h2>
         </Space>
         <Space>
-          <Button icon={<PlayCircleOutlined />} onClick={testFrame}>Test Frame</Button>
+          <Button icon={<PlayCircleOutlined />} onClick={testFrame}>Send to Device</Button>
           <Button type="primary" icon={<SaveOutlined />} onClick={handleSave}>Save</Button>
         </Space>
       </div>

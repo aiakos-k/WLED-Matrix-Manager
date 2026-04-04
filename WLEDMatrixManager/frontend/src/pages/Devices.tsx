@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Button, Card, Col, Divider, Form, Input, InputNumber, message, Modal,
-  Row, Select, Space, Table, Tag, Popconfirm, Spin, Alert, Typography,
+  Row, Select, Slider, Space, Table, Tag, Popconfirm, Spin, Alert, Typography,
 } from 'antd';
 import {
   PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined,
@@ -19,6 +19,13 @@ const { Text } = Typography;
 const PROTOCOLS = [
   { value: 'udp_dnrgb', label: 'UDP DNRGB (Recommended)' },
   { value: 'json_api', label: 'JSON API (HTTP)' },
+];
+
+const SCALE_MODES = [
+  { value: 'stretch', label: 'Stretch (resize to fit)' },
+  { value: 'tile', label: 'Tile (repeat pattern)' },
+  { value: 'center', label: 'Center (pad with black)' },
+  { value: 'none', label: 'None (1:1, crop if larger)' },
 ];
 
 const Devices: React.FC = () => {
@@ -168,6 +175,10 @@ const Devices: React.FC = () => {
       communication_protocol: 'udp_dnrgb',
       chain_count: 1,
       segment_id: 0,
+      base_brightness: haDevice.attributes?.brightness != null
+        ? Math.round(Number(haDevice.attributes.brightness) * 255 / 100)
+        : 255,
+      scale_mode: 'stretch',
     });
     setDiscoveryOpen(false);
     setEditDevice(null);
@@ -241,6 +252,7 @@ const Devices: React.FC = () => {
             form.setFieldsValue({
               matrix_width: 16, matrix_height: 16,
               communication_protocol: 'udp_dnrgb', chain_count: 1, segment_id: 0,
+              base_brightness: 255, scale_mode: 'stretch',
             });
             setModalOpen(true);
           }}>
@@ -330,6 +342,15 @@ const Devices: React.FC = () => {
               </Form.Item>
             </Col>
           </Row>
+          <Form.Item name="scale_mode" label="Scale Mode"
+            extra="How to map scene pixels when scene and device sizes differ">
+            <Select options={SCALE_MODES} />
+          </Form.Item>
+          <Form.Item name="base_brightness" label={
+            <span>Base Brightness ({form.getFieldValue('base_brightness') ?? 255})</span>
+          } extra="Device-level brightness applied to all scenes">
+            <Slider min={0} max={255} />
+          </Form.Item>
         </Form>
       </Modal>
 

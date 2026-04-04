@@ -57,6 +57,8 @@ export interface DeviceData {
   communication_protocol: string;
   chain_count: number;
   segment_id: number;
+  base_brightness: number;
+  scale_mode: string;
   is_active: boolean;
   is_healthy?: boolean;
 }
@@ -163,6 +165,21 @@ export const getPlaybackStatus = () =>
   request<Record<string, { is_playing: boolean; loop_mode: string }>>(
     "/playback/status",
   );
+
+// ─── Test Frame (send directly to device) ───────────────
+
+export const testFrameOnDevice = (data: {
+  device_ids: number[];
+  pixel_data: FrameData["pixel_data"];
+  brightness?: number;
+  color_r?: number;
+  color_g?: number;
+  color_b?: number;
+}) =>
+  request<{ success: boolean }>("/devices/test-frame", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 
 // ─── Export / Import ────────────────────────────────────
 

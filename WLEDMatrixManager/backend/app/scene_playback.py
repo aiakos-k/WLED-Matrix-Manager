@@ -16,11 +16,11 @@ playback_lock = threading.Lock()
 
 
 def upscale_pixel_data(
-    pixel_data: dict, target_width: int, target_height: int, mode: str = "auto"
+    pixel_data: dict, target_width: int, target_height: int, mode: str = "stretch"
 ) -> dict:
     """
-    Upscale pixel data from scene resolution to device resolution.
-    Modes: 'auto', 'integer', 'stretch', 'center'
+    Scale pixel data from scene resolution to device resolution.
+    Modes: 'stretch', 'tile', 'center', 'none'
     """
     source_width = pixel_data.get("width", 16)
     source_height = pixel_data.get("height", 16)
@@ -29,16 +29,11 @@ def upscale_pixel_data(
     if source_width == target_width and source_height == target_height:
         return pixel_data
 
+    if mode == "none":
+        return pixel_data
+
     scale_x = target_width / source_width
     scale_y = target_height / source_height
-
-    if mode == "auto":
-        if scale_x == scale_y and scale_x % 1 == 0:
-            mode = "integer"
-        elif source_width <= target_width and source_height <= target_height:
-            mode = "stretch"
-        else:
-            return pixel_data
 
     source_pixel_map = {}
     for pixel in source_pixels:
@@ -46,23 +41,35 @@ def upscale_pixel_data(
 
     upscaled_pixels = []
 
-    if mode == "integer":
-        scale = int(scale_x)
-        for sy in range(source_height):
-            for sx in range(source_width):
-                si = sy * source_width + sx
-                color = source_pixel_map.get(si, [0, 0, 0])
-                for dy in range(scale):
-                    for dx in range(scale):
-                        tx = sx * scale + dx
-                        ty = sy * scale + dy
+    if mode == "stretch":
+        # Check if integer scale is possible first
+        if scale_x == scale_y and scale_x % 1 == 0 and scale_x >= 1:
+            scale = int(scale_x)
+            for sy in range(source_height):
+                for sx in range(source_width):
+                    si = sy * source_width + sx
+                    color = source_pixel_map.get(si, [0, 0, 0])
+                    for dy in range(scale):
+                        for dx in range(scale):
+                            tx = sx * scale + dx
+                            ty = sy * scale + dy
+                            ti = ty * target_width + tx
+                            upscaled_pixels.append({"index": ti, "color": color})
+        else:
+            for ty in range(target_height):
+                for tx in range(target_width):
+                    sx = min(int(tx / scale_x), source_width - 1)
+                    sy = min(int(ty / scale_y), source_height - 1)
+                    si = sy * source_width + sx
+                    color = source_pixel_map.get(si, [0, 0, 0])
+                    if color != [0, 0, 0]:
                         ti = ty * target_width + tx
                         upscaled_pixels.append({"index": ti, "color": color})
-    elif mode == "stretch":
+    elif mode == "tile":
         for ty in range(target_height):
             for tx in range(target_width):
-                sx = min(int(tx / scale_x), source_width - 1)
-                sy = min(int(ty / scale_y), source_height - 1)
+                sx = tx % source_width
+                sy = ty % source_height
                 si = sy * source_width + sx
                 color = source_pixel_map.get(si, [0, 0, 0])
                 if color != [0, 0, 0]:
@@ -137,8 +144,13 @@ class ScenePlayback:
                         protocol = device.get("communication_protocol", "udp_dnrgb")
                         dw = device.get("matrix_width", 16)
                         dh = device.get("matrix_height", 16)
+                        scale_mode = device.get("scale_mode", "stretch")
+                        base_bri = device.get("base_brightness", 255)
+                        effective_bri = int(brightness * base_bri / 255)
 
-                        upscaled = upscale_pixel_data(pixel_data, dw, dh)
+                        upscaled = upscale_pixel_data(
+                            pixel_data, dw, dh, mode=scale_mode
+                        )
 
                         try:
                             if protocol == "udp_dnrgb":
@@ -148,7 +160,7 @@ class ScenePlayback:
                                 DeviceController.send_udp_dnrgb(
                                     ip,
                                     pd,
-                                    brightness=brightness,
+                                    brightness=effective_bri,
                                     frame_duration=duration,
                                     color_r=color_r,
                                     color_g=color_g,
@@ -157,7 +169,7 @@ class ScenePlayback:
                             else:
                                 cmd = DeviceController.generate_wled_command(
                                     upscaled,
-                                    brightness=brightness,
+                                    brightness=effective_bri,
                                     color_r=color_r,
                                     color_g=color_g,
                                     color_b=color_b,

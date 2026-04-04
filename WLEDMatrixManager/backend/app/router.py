@@ -7,6 +7,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -27,6 +28,7 @@ from .models import (
     SceneResponse,
     SceneUpdate,
     Status,
+    scene_device_association,
 )
 from .scene_playback import (
     get_all_playback_status,
@@ -226,11 +228,14 @@ async def create_scene(data: SceneCreate, db: AsyncSession = Depends(get_session
         )
         db.add(frame)
 
-    # Link devices
+    # Link devices via association table (avoids lazy-load in async context)
     if data.device_ids:
-        result = await db.execute(select(Device).where(Device.id.in_(data.device_ids)))
-        devices = result.scalars().all()
-        scene.devices = list(devices)
+        for did in data.device_ids:
+            await db.execute(
+                scene_device_association.insert().values(
+                    scene_id=scene.id, device_id=did
+                )
+            )
 
     await db.commit()
     await db.refresh(scene, ["frames", "devices"])
@@ -381,6 +386,8 @@ async def play_scene(
             "matrix_height": d.matrix_height,
             "chain_count": d.chain_count,
             "segment_id": d.segment_id,
+            "base_brightness": getattr(d, "base_brightness", 255) or 255,
+            "scale_mode": getattr(d, "scale_mode", "stretch") or "stretch",
         }
         for d in devices
     ]
@@ -406,6 +413,57 @@ async def play_scene(
 async def stop_scene(scene_id: int):
     stop_scene_playback(scene_id)
     return {"success": True}
+
+
+class TestFrameRequest(BaseModel):
+    device_ids: list[int]
+    pixel_data: dict
+    brightness: int = 255
+    color_r: int = 100
+    color_g: int = 100
+    color_b: int = 100
+
+
+@router.post("/devices/test-frame")
+async def test_frame(data: TestFrameRequest, db: AsyncSession = Depends(get_session)):
+    """Send a single frame directly to devices without creating a scene."""
+    result = await db.execute(select(Device).where(Device.id.in_(data.device_ids)))
+    devices = result.scalars().all()
+    if not devices:
+        raise HTTPException(404, "No devices found")
+
+    from .scene_playback import upscale_pixel_data
+
+    results = []
+    for dev in devices:
+        base_bri = getattr(dev, "base_brightness", 255) or 255
+        effective_bri = int(data.brightness * base_bri / 255)
+        scale_mode = getattr(dev, "scale_mode", "stretch") or "stretch"
+        scaled = upscale_pixel_data(
+            data.pixel_data, dev.matrix_width, dev.matrix_height, mode=scale_mode
+        )
+
+        if dev.communication_protocol == Device.PROTOCOL_UDP_DNRGB:
+            ok = DeviceController.send_udp_dnrgb(
+                dev.ip_address,
+                scaled,
+                brightness=effective_bri,
+                color_r=data.color_r,
+                color_g=data.color_g,
+                color_b=data.color_b,
+            )
+        else:
+            cmd = DeviceController.generate_wled_command(
+                scaled,
+                brightness=effective_bri,
+                color_r=data.color_r,
+                color_g=data.color_g,
+                color_b=data.color_b,
+            )
+            ok = await DeviceController.send_json_command(dev.ip_address, cmd)
+        results.append({"device_id": dev.id, "success": ok})
+
+    return {"success": all(r["success"] for r in results), "results": results}
 
 
 @router.get("/playback/status")

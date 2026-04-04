@@ -48,6 +48,8 @@ class Device(Base):
     communication_protocol = Column(String(20), default=PROTOCOL_UDP_DNRGB)
     chain_count = Column(Integer, default=1)
     segment_id = Column(Integer, default=0)
+    base_brightness = Column(Integer, default=255)  # Device-level brightness (0-255)
+    scale_mode = Column(String(20), default="stretch")  # none, stretch, tile, center
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -124,6 +126,8 @@ class DeviceCreate(BaseModel):
     communication_protocol: str = "udp_dnrgb"
     chain_count: int = 1
     segment_id: int = 0
+    base_brightness: int = 255
+    scale_mode: str = "stretch"
 
 
 class DeviceUpdate(BaseModel):
@@ -135,6 +139,8 @@ class DeviceUpdate(BaseModel):
     communication_protocol: Optional[str] = None
     chain_count: Optional[int] = None
     segment_id: Optional[int] = None
+    base_brightness: Optional[int] = None
+    scale_mode: Optional[str] = None
 
 
 class DeviceResponse(BaseModel):
@@ -147,6 +153,8 @@ class DeviceResponse(BaseModel):
     communication_protocol: str
     chain_count: int
     segment_id: int
+    base_brightness: int = 255
+    scale_mode: str = "stretch"
     is_active: bool
     is_healthy: Optional[bool] = None
 

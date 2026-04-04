@@ -204,14 +204,15 @@ else:
     print('already patched or pattern changed')
 "
 
-# 2. Supervisor-Prozess neustarten (NICHT 'ha supervisor restart' — das löscht den Patch!)
-docker exec hassio_supervisor pkill -f 'python3 -m supervisor'
+# 2. Supervisor neustarten (NICHT 'ha supervisor restart' — das löscht den Patch!)
+docker restart hassio_supervisor
 
-# 3. 10 Sekunden warten, dann Onboarding erneut versuchen
+# 3. ~20 Sekunden warten, dann Onboarding erneut versuchen
 ```
 
-> **Wichtig:** `ha supervisor restart` erstellt den Container neu und löscht alle Patches.
-> Stattdessen immer `pkill` innerhalb des Containers verwenden.
+> **Wichtig:** Immer `docker restart hassio_supervisor` verwenden!
+> - `ha supervisor restart` erstellt den Container neu → Patches weg
+> - `pkill` verursacht Kaskade → Docker-Daemon crasht
 
 ### "Port already in use"
 

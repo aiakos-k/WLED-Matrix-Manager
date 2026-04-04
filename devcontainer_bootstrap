@@ -124,11 +124,13 @@ else:
   # Copy apparmor_parser into supervisor container
   docker cp /usr/local/bin/apparmor_parser hassio_supervisor:/usr/sbin/apparmor_parser 2>/dev/null || true
 
-  # Restart supervisor process INSIDE the container (s6 restarts it, patches survive)
-  # NOTE: "ha supervisor restart" recreates the container and wipes all patches!
-  echo "  🔄 Restarting Supervisor process to apply patches..."
-  docker exec hassio_supervisor pkill -f "python3 -m supervisor" 2>/dev/null || true
-  sleep 10
+  # Restart supervisor container to apply patches.
+  # IMPORTANT: Use "docker restart" (preserves file changes in the container).
+  # NEVER use "ha supervisor restart" (recreates container from image = patches lost)!
+  # NEVER use "pkill" (cascading failure kills Docker daemon)!
+  echo "  🔄 Restarting Supervisor container to apply patches..."
+  docker restart hassio_supervisor 2>/dev/null || true
+  sleep 15
 }
 
 # Monitor supervisor container and re-apply patches after restarts/updates

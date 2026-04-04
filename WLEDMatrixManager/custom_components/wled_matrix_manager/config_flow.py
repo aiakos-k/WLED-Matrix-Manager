@@ -16,7 +16,7 @@ class WLEDMatrixManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        """Handle the initial step."""
+        """Handle the initial step (manual setup)."""
         errors: dict[str, str] = {}
 
         if user_input is not None:

@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Button, Card, Col, Collapse, Divider, Form, Input, InputNumber,
+  Button, Card, Checkbox, Col, Collapse, Divider, Form, Input, InputNumber,
   message, Modal, Radio, Row, Select, Slider, Space, Tooltip, Upload,
 } from 'antd';
 import {
   SaveOutlined, PlayCircleOutlined, DeleteOutlined, PlusOutlined,
-  UploadOutlined, StopOutlined, ArrowLeftOutlined,
+  UploadOutlined, StopOutlined, ArrowLeftOutlined, ExportOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -30,7 +31,7 @@ function rgbToHex(r: number, g: number, b: number): string {
   return '#' + [r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('');
 }
 
-type Pixel = { index: number; color: number[] };
+type CropBox = { x: number; y: number; width: number; height: number };
 
 const SceneEditor: React.FC = () => {
   const navigate = useNavigate();
@@ -54,6 +55,7 @@ const SceneEditor: React.FC = () => {
 
   // Drawing
   const [selectedColor, setSelectedColor] = useState('#FF0000');
+  const [recentColors, setRecentColors] = useState<string[]>([]);
   const [selectedPixels, setSelectedPixels] = useState<Set<number>>(new Set());
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -63,8 +65,26 @@ const SceneEditor: React.FC = () => {
   const [selectedDevices, setSelectedDevices] = useState<number[]>([]);
   const [loopMode, setLoopMode] = useState<string>('once');
 
-  // WLED JSON import
+  // WLED JSON import / export
   const [wledJson, setWledJson] = useState('');
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportedWledJson, setExportedWledJson] = useState('');
+
+  // Image upload modal
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<{ src: string; width: number; height: number } | null>(null);
+  const [cropBox, setCropBox] = useState<CropBox>({ x: 0, y: 0, width: 100, height: 100 });
+  const [previewPixels, setPreviewPixels] = useState<number[][] | null>(null);
+  const [invertColors, setInvertColors] = useState(false);
+  const [makeTransparent, setMakeTransparent] = useState(false);
+  const [transparentColor, setTransparentColor] = useState('#FFFFFF');
+  const [colorThreshold, setColorThreshold] = useState(30);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Playback animation from editor
+  const [isPlaying, setIsPlaying] = useState(false);
+  const playbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // WebSocket for live preview
   const { send: wsSend } = useWebSocket();
@@ -86,6 +106,20 @@ const SceneEditor: React.FC = () => {
     // Load devices
     getDevices().then(setDevices).catch(() => {});
   }, [id, isEdit, form]);
+
+  // Cleanup playback timer on unmount
+  useEffect(() => {
+    return () => {
+      if (playbackTimer.current) clearTimeout(playbackTimer.current);
+    };
+  }, []);
+
+  const addRecentColor = useCallback((color: string) => {
+    setRecentColors((prev) => {
+      const filtered = prev.filter((c) => c.toLowerCase() !== color.toLowerCase());
+      return [color, ...filtered].slice(0, 5);
+    });
+  }, []);
 
   // ─── Pixel helpers ──────────────────────────────────────
 
@@ -199,7 +233,11 @@ const SceneEditor: React.FC = () => {
       e.preventDefault();
       const pixelMap = getPixelMap();
       const color = pixelMap.get(idx);
-      if (color) setSelectedColor(rgbToHex(color[0], color[1], color[2]));
+      if (color) {
+        const hex = rgbToHex(color[0], color[1], color[2]);
+        setSelectedColor(hex);
+        addRecentColor(hex);
+      }
       return;
     }
 
@@ -216,6 +254,7 @@ const SceneEditor: React.FC = () => {
 
     setIsDrawing(true);
     setPixel(idx, hexToRgb(selectedColor));
+    addRecentColor(selectedColor);
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -245,7 +284,6 @@ const SceneEditor: React.FC = () => {
         const pixels = [...(frame.pixel_data?.pixels || [])];
         const pixelMap = new Map(pixels.map((p) => [p.index, p.color]));
 
-        // Collect selected pixels with their colors
         const moved: { oldIdx: number; newIdx: number; color: number[] }[] = [];
         for (const idx of selectedPixels) {
           const x = idx % width;
@@ -257,7 +295,6 @@ const SceneEditor: React.FC = () => {
           moved.push({ oldIdx: idx, newIdx, color: pixelMap.get(idx) || hexToRgb(selectedColor) });
         }
 
-        // Remove old positions, set new ones
         const resultMap = new Map(pixelMap);
         for (const m of moved) {
           if (!selectedPixels.has(m.newIdx)) resultMap.delete(m.oldIdx);
@@ -270,7 +307,6 @@ const SceneEditor: React.FC = () => {
         };
         next[currentFrame] = frame;
 
-        // Update selection
         setSelectedPixels(new Set(moved.map((m) => m.newIdx)));
         return next;
       });
@@ -350,33 +386,238 @@ const SceneEditor: React.FC = () => {
     setWledJson('');
   };
 
-  // ─── Image Upload ───────────────────────────────────────
+  // ─── WLED JSON Export ───────────────────────────────────
 
-  const handleImageUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const base = window.location.pathname.replace(/\/$/, '');
+  const exportCurrentFrameAsWled = () => {
+    const frame = frames[currentFrame];
+    const pixels = [...(frame.pixel_data?.pixels || [])].sort((a, b) => a.index - b.index);
 
-    try {
-      const resp = await fetch(`${base}/api/image/convert?width=${width}&height=${height}&colors=256`, {
-        method: 'POST',
-        body: formData,
-      });
-      if (!resp.ok) throw new Error('Upload failed');
-      const data = await resp.json();
-      setFrames((prev) => {
-        const next = [...prev];
-        next[currentFrame] = {
-          ...next[currentFrame],
-          pixel_data: { pixels: data.pixels, width, height },
-        };
-        return next;
-      });
-      message.success(`Imported ${data.pixels.length} pixels from image`);
-    } catch {
-      message.error('Image conversion failed');
+    // Build WLED array with range compression
+    const wledArray: (number | number[])[] = [];
+    let i = 0;
+    while (i < pixels.length) {
+      const curr = pixels[i];
+      let endI = i;
+      // Find consecutive pixels with same color
+      while (
+        endI + 1 < pixels.length &&
+        pixels[endI + 1].index === pixels[endI].index + 1 &&
+        pixels[endI + 1].color[0] === curr.color[0] &&
+        pixels[endI + 1].color[1] === curr.color[1] &&
+        pixels[endI + 1].color[2] === curr.color[2]
+      ) {
+        endI++;
+      }
+
+      if (endI === i) {
+        // Single pixel
+        wledArray.push(curr.index, curr.color);
+      } else {
+        // Range (exclusive end)
+        wledArray.push(curr.index, pixels[endI].index + 1, curr.color);
+      }
+      i = endI + 1;
     }
+
+    const wledObj = {
+      on: true,
+      bri: frame.brightness ?? 128,
+      seg: { id: 0, i: wledArray },
+    };
+
+    setExportedWledJson(JSON.stringify(wledObj));
+    setExportModalOpen(true);
+  };
+
+  // ─── Image Upload & Crop Modal ──────────────────────────
+
+  const handleImageUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        setUploadedImage({ src: ev.target!.result as string, width: img.width, height: img.height });
+        const size = Math.min(img.width, img.height);
+        setCropBox({
+          x: (img.width - size) / 2,
+          y: (img.height - size) / 2,
+          width: size,
+          height: size,
+        });
+        setInvertColors(false);
+        setMakeTransparent(false);
+        setPreviewPixels(null);
+        setShowImageModal(true);
+      };
+      img.src = ev.target!.result as string;
+    };
+    reader.readAsDataURL(file);
     return false;
+  };
+
+  // Update preview when crop/options change
+  useEffect(() => {
+    if (!uploadedImage || !previewCanvasRef.current) return;
+
+    const canvas = previewCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const img = new Image();
+    img.onload = () => {
+      const scaleFactor = 15;
+      canvas.width = width * scaleFactor;
+      canvas.height = height * scaleFactor;
+
+      ctx.drawImage(
+        img,
+        cropBox.x, cropBox.y, cropBox.width, cropBox.height,
+        0, 0, canvas.width, canvas.height,
+      );
+
+      const scaledData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const pxArr: number[][] = [];
+      for (let py = 0; py < height; py++) {
+        for (let px = 0; px < width; px++) {
+          const sx = Math.floor(px * scaleFactor + scaleFactor / 2);
+          const sy = Math.floor(py * scaleFactor + scaleFactor / 2);
+          const idx = (sy * canvas.width + sx) * 4;
+          let r = scaledData[idx], g = scaledData[idx + 1], b = scaledData[idx + 2];
+          if (invertColors) { r = 255 - r; g = 255 - g; b = 255 - b; }
+          pxArr.push([r, g, b]);
+        }
+      }
+      setPreviewPixels(pxArr);
+    };
+    img.src = uploadedImage.src;
+  }, [uploadedImage, cropBox, width, height, invertColors, makeTransparent, transparentColor, colorThreshold]);
+
+  const handlePreviewClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!makeTransparent || !previewPixels || !previewCanvasRef.current) return;
+    const canvas = previewCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleFactor = 15;
+    const px = Math.floor((e.clientX - rect.left) / (rect.width / width));
+    const py = Math.floor((e.clientY - rect.top) / (rect.height / height));
+    if (px >= 0 && px < width && py >= 0 && py < height) {
+      const idx = py * width + px;
+      if (previewPixels[idx]) {
+        const [r, g, b] = previewPixels[idx];
+        setTransparentColor(rgbToHex(r, g, b));
+      }
+    }
+  };
+
+  const applyImageToCanvas = () => {
+    if (!previewPixels) return;
+    const newPixels: Array<{ index: number; color: number[] }> = [];
+
+    let tR = 255, tG = 255, tB = 255;
+    if (makeTransparent) {
+      [tR, tG, tB] = hexToRgb(transparentColor);
+    }
+
+    previewPixels.forEach((color, index) => {
+      const [r, g, b] = color;
+      // Skip transparent color if enabled
+      if (
+        makeTransparent &&
+        Math.abs(r - tR) <= colorThreshold &&
+        Math.abs(g - tG) <= colorThreshold &&
+        Math.abs(b - tB) <= colorThreshold
+      ) return;
+      // Skip near-black pixels
+      if (r <= 30 && g <= 30 && b <= 30) return;
+      newPixels.push({ index, color: [r, g, b] });
+    });
+
+    // Merge with existing pixels (new ones overwrite)
+    setFrames((prev) => {
+      const next = [...prev];
+      const frame = { ...next[currentFrame] };
+      const existing = new Map<number, number[]>();
+      for (const px of frame.pixel_data?.pixels || []) existing.set(px.index, px.color);
+      for (const px of newPixels) existing.set(px.index, px.color);
+      frame.pixel_data = {
+        pixels: Array.from(existing, ([index, color]) => ({ index, color })),
+        width, height,
+      };
+      next[currentFrame] = frame;
+      return next;
+    });
+
+    setShowImageModal(false);
+    message.success('Image imported to canvas');
+  };
+
+  const handleCropMouseDown = (e: React.MouseEvent, handle: string | null) => {
+    if (!imageRef.current || !uploadedImage) return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    const imgRect = imageRef.current.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startCrop = { ...cropBox };
+    const scaleX = imgRect.width / uploadedImage.width;
+    const scaleY = imgRect.height / uploadedImage.height;
+    const minSize = 10;
+
+    const onMove = (mv: MouseEvent) => {
+      const dx = (mv.clientX - startX) / scaleX;
+      const dy = (mv.clientY - startY) / scaleY;
+      const c = { ...startCrop };
+
+      if (!handle) {
+        // Move entire box
+        c.x = Math.max(0, Math.min(uploadedImage.width - c.width, startCrop.x + dx));
+        c.y = Math.max(0, Math.min(uploadedImage.height - c.height, startCrop.y + dy));
+      } else {
+        // Resize from handle
+        if (handle.includes('w')) { c.x = Math.max(0, startCrop.x + dx); c.width = Math.max(minSize, startCrop.width - dx); }
+        if (handle.includes('e')) { c.width = Math.max(minSize, startCrop.width + dx); }
+        if (handle.includes('n')) { c.y = Math.max(0, startCrop.y + dy); c.height = Math.max(minSize, startCrop.height - dy); }
+        if (handle.includes('s')) { c.height = Math.max(minSize, startCrop.height + dy); }
+        // Clamp to image bounds
+        c.x = Math.max(0, Math.min(c.x, uploadedImage.width - c.width));
+        c.y = Math.max(0, Math.min(c.y, uploadedImage.height - c.height));
+        c.width = Math.min(c.width, uploadedImage.width - c.x);
+        c.height = Math.min(c.height, uploadedImage.height - c.y);
+      }
+      setCropBox(c);
+    };
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  // ─── Play/Stop animation from editor ────────────────────
+
+  const startPlayback = () => {
+    if (frames.length <= 1) { message.info('Need more than one frame to play'); return; }
+    setIsPlaying(true);
+    let idx = 0;
+
+    const playNext = () => {
+      if (idx >= frames.length) {
+        if (loopMode === 'loop') { idx = 0; } else { setIsPlaying(false); return; }
+      }
+      setCurrentFrame(idx);
+      const dur = (frames[idx]?.duration || 1.0) * 1000;
+      idx++;
+      playbackTimer.current = setTimeout(playNext, dur);
+    };
+    playNext();
+  };
+
+  const stopPlayback = () => {
+    setIsPlaying(false);
+    if (playbackTimer.current) { clearTimeout(playbackTimer.current); playbackTimer.current = null; }
   };
 
   // ─── Live preview via WebSocket ─────────────────────────
@@ -453,7 +694,6 @@ const SceneEditor: React.FC = () => {
   const handleResize = (newW: number, newH: number) => {
     setWidth(newW);
     setHeight(newH);
-    // Update all frames' pixel_data dimensions
     setFrames((prev) =>
       prev.map((f) => ({
         ...f,
@@ -475,6 +715,28 @@ const SceneEditor: React.FC = () => {
   };
 
   const curFrame = frames[currentFrame];
+
+  // ─── Crop overlay handles ───────────────────────────────
+
+  const cropHandles = uploadedImage ? (() => {
+    const lPct = (cropBox.x / uploadedImage.width) * 100;
+    const tPct = (cropBox.y / uploadedImage.height) * 100;
+    const wPct = (cropBox.width / uploadedImage.width) * 100;
+    const hPct = (cropBox.height / uploadedImage.height) * 100;
+    const hs = 10; // handle size
+    const ho = -hs / 2; // handle offset
+    const handles: { key: string; style: React.CSSProperties; cursor: string }[] = [
+      { key: 'nw', cursor: 'nwse-resize', style: { left: ho, top: ho, width: hs, height: hs } },
+      { key: 'ne', cursor: 'nesw-resize', style: { right: ho, top: ho, width: hs, height: hs } },
+      { key: 'sw', cursor: 'nesw-resize', style: { left: ho, bottom: ho, width: hs, height: hs } },
+      { key: 'se', cursor: 'nwse-resize', style: { right: ho, bottom: ho, width: hs, height: hs } },
+      { key: 'n', cursor: 'ns-resize', style: { left: '50%', top: -3, transform: 'translateX(-50%)', width: 30, height: 6 } },
+      { key: 's', cursor: 'ns-resize', style: { left: '50%', bottom: -3, transform: 'translateX(-50%)', width: 30, height: 6 } },
+      { key: 'e', cursor: 'ew-resize', style: { right: -3, top: '50%', transform: 'translateY(-50%)', width: 6, height: 30 } },
+      { key: 'w', cursor: 'ew-resize', style: { left: -3, top: '50%', transform: 'translateY(-50%)', width: 6, height: 30 } },
+    ];
+    return { lPct, tPct, wPct, hPct, handles };
+  })() : null;
 
   return (
     <div>
@@ -537,7 +799,7 @@ const SceneEditor: React.FC = () => {
             <div style={{ marginBottom: 8 }}>
               <label>Color:</label>
               <input type="color" value={selectedColor}
-                onChange={(e) => setSelectedColor(e.target.value)}
+                onChange={(e) => { setSelectedColor(e.target.value); addRecentColor(e.target.value); }}
                 style={{ width: '100%', height: 32, cursor: 'pointer', border: 'none' }}
               />
             </div>
@@ -545,17 +807,38 @@ const SceneEditor: React.FC = () => {
               <label>Common Colors:</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {COMMON_COLORS.map((c) => (
-                  <div key={c}
-                    onClick={() => setSelectedColor(c)}
-                    style={{
-                      width: 24, height: 24, background: c, cursor: 'pointer',
-                      border: selectedColor === c ? '2px solid #1890ff' : '1px solid #ccc',
-                      borderRadius: 2,
-                    }}
-                  />
+                  <Tooltip key={c} title={c}>
+                    <div
+                      onClick={() => { setSelectedColor(c); addRecentColor(c); }}
+                      style={{
+                        width: 24, height: 24, background: c, cursor: 'pointer',
+                        border: selectedColor === c ? '2px solid #1890ff' : '1px solid #ccc',
+                        borderRadius: 2,
+                      }}
+                    />
+                  </Tooltip>
                 ))}
               </div>
             </div>
+            {recentColors.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <label>Recent:</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {recentColors.map((c) => (
+                    <Tooltip key={c} title={c}>
+                      <div
+                        onClick={() => setSelectedColor(c)}
+                        style={{
+                          width: 24, height: 24, background: c, cursor: 'pointer',
+                          border: selectedColor === c ? '2px solid #1890ff' : '1px solid #ccc',
+                          borderRadius: 2,
+                        }}
+                      />
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
+            )}
             <Divider style={{ margin: '8px 0' }} />
             <p style={{ fontSize: 12, color: '#666' }}>
               Click: draw &bull; Right-click: pick color<br />
@@ -575,12 +858,16 @@ const SceneEditor: React.FC = () => {
 
           <Collapse size="small" items={[{
             key: 'wled',
-            label: 'Import WLED JSON',
+            label: 'WLED JSON Import / Export',
             children: (
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Input.TextArea value={wledJson} onChange={(e) => setWledJson(e.target.value)}
-                  rows={3} placeholder='{"seg":{"i":[...]}}' />
-                <Button block onClick={importWledJson}>Import</Button>
+                  rows={3} placeholder='{"seg":{"i":[...]}} or curl command' />
+                <Button block onClick={importWledJson}>Import to Frame {currentFrame + 1}</Button>
+                <Divider style={{ margin: '8px 0' }} />
+                <Button block icon={<ExportOutlined />} onClick={exportCurrentFrameAsWled}>
+                  Export Frame {currentFrame + 1} as WLED JSON
+                </Button>
               </Space>
             ),
           }]} />
@@ -638,11 +925,11 @@ const SceneEditor: React.FC = () => {
             </Space>
           </Card>
 
-          <Card title="Frames" size="small">
+          <Card title="Frames" size="small" style={{ marginBottom: 16 }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <div style={{ maxHeight: 300, overflow: 'auto' }}>
                 {frames.map((f, i) => (
-                  <div key={i} onClick={() => setCurrentFrame(i)}
+                  <div key={i} onClick={() => { if (!isPlaying) setCurrentFrame(i); }}
                     style={{
                       padding: '4px 8px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between',
                       alignItems: 'center', borderRadius: 4,
@@ -663,8 +950,183 @@ const SceneEditor: React.FC = () => {
               </Space>
             </Space>
           </Card>
+
+          <Card title="Playback" size="small">
+            <Space style={{ width: '100%' }}>
+              {isPlaying ? (
+                <Button danger icon={<StopOutlined />} onClick={stopPlayback}>Stop</Button>
+              ) : (
+                <Button icon={<PlayCircleOutlined />} onClick={startPlayback}
+                  disabled={frames.length <= 1}>
+                  Play ({loopMode === 'loop' ? 'Loop' : 'Once'})
+                </Button>
+              )}
+            </Space>
+          </Card>
         </Col>
       </Row>
+
+      {/* ─── Image Import Modal ──────────────────────────── */}
+      <Modal
+        title="Import Image"
+        open={showImageModal}
+        width={900}
+        onCancel={() => setShowImageModal(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setShowImageModal(false)}>Cancel</Button>,
+          <Button key="import" type="primary" onClick={applyImageToCanvas}>Import to Canvas</Button>,
+        ]}
+      >
+        {uploadedImage && (
+          <div style={{ display: 'flex', gap: 20 }}>
+            {/* Left: Image with crop overlay */}
+            <div style={{ flex: 1 }}>
+              <h4>Select Region</h4>
+              <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
+                <img
+                  ref={imageRef}
+                  src={uploadedImage.src}
+                  style={{ maxWidth: '100%', maxHeight: 400, display: 'block' }}
+                />
+                {cropHandles && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${cropHandles.lPct}%`, top: `${cropHandles.tPct}%`,
+                      width: `${cropHandles.wPct}%`, height: `${cropHandles.hPct}%`,
+                      border: '3px solid #1890ff',
+                      boxShadow: 'inset 0 0 0 4000px rgba(0,0,0,0.5)',
+                      cursor: 'move',
+                    }}
+                    onMouseDown={(e) => handleCropMouseDown(e, null)}
+                  >
+                    {cropHandles.handles.map((h) => (
+                      <div key={h.key}
+                        onMouseDown={(e) => handleCropMouseDown(e, h.key)}
+                        style={{
+                          position: 'absolute', ...h.style,
+                          backgroundColor: '#1890ff', cursor: h.cursor,
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Crop numeric inputs */}
+              <div style={{ marginTop: 12 }}>
+                <label>Crop Position & Size:</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 8 }}>
+                  <InputNumber addonBefore="X" size="small" min={0} max={uploadedImage.width}
+                    value={Math.round(cropBox.x)} onChange={(v) => setCropBox((p) => ({ ...p, x: v || 0 }))} />
+                  <InputNumber addonBefore="Y" size="small" min={0} max={uploadedImage.height}
+                    value={Math.round(cropBox.y)} onChange={(v) => setCropBox((p) => ({ ...p, y: v || 0 }))} />
+                  <InputNumber addonBefore="W" size="small" min={10} max={uploadedImage.width}
+                    value={Math.round(cropBox.width)} onChange={(v) => setCropBox((p) => ({ ...p, width: v || 10 }))} />
+                  <InputNumber addonBefore="H" size="small" min={10} max={uploadedImage.height}
+                    value={Math.round(cropBox.height)} onChange={(v) => setCropBox((p) => ({ ...p, height: v || 10 }))} />
+                </div>
+                <Space style={{ marginTop: 8, width: '100%' }} direction="vertical">
+                  <Button block onClick={() => {
+                    const s = Math.min(uploadedImage.width, uploadedImage.height);
+                    setCropBox({ x: (uploadedImage.width - s) / 2, y: (uploadedImage.height - s) / 2, width: s, height: s });
+                  }}>Square Crop</Button>
+                  <Button block onClick={() => setCropBox({ x: 0, y: 0, width: uploadedImage.width, height: uploadedImage.height })}>
+                    Full Image
+                  </Button>
+                </Space>
+              </div>
+
+              {/* Color processing options */}
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid #eee' }}>
+                <label style={{ fontWeight: 'bold' }}>Color Processing:</label>
+                <div style={{ marginTop: 8 }}>
+                  <Checkbox checked={invertColors} onChange={(e) => setInvertColors(e.target.checked)}>
+                    Invert Colors
+                  </Checkbox>
+                  <p style={{ fontSize: 12, color: '#666', margin: '4px 0 0 24px' }}>
+                    Converts colors (white ↔ black, etc.)
+                  </p>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <Checkbox checked={makeTransparent} onChange={(e) => setMakeTransparent(e.target.checked)}>
+                    Make Color Transparent
+                  </Checkbox>
+                  <p style={{ fontSize: 12, color: '#666', margin: '4px 0 0 24px' }}>
+                    Remove a specific color (e.g. white background)
+                  </p>
+                  {makeTransparent && (
+                    <div style={{ marginLeft: 24, marginTop: 8 }}>
+                      <div style={{ marginBottom: 8 }}>
+                        <label style={{ fontSize: 12 }}>Color to Remove:</label>
+                        <div
+                          onClick={() => {
+                            const inp = document.createElement('input');
+                            inp.type = 'color';
+                            inp.value = transparentColor;
+                            inp.onchange = (ev) => setTransparentColor((ev.target as HTMLInputElement).value);
+                            inp.click();
+                          }}
+                          style={{
+                            backgroundColor: transparentColor,
+                            width: 60, height: 28, borderRadius: 4,
+                            cursor: 'pointer', border: '1px solid #ccc', marginTop: 4,
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12 }}>Threshold: {colorThreshold}</label>
+                        <Slider min={0} max={100} value={colorThreshold} onChange={setColorThreshold} />
+                        <p style={{ fontSize: 11, color: '#999', margin: '4px 0 0 0' }}>
+                          How close colors need to match (0 = exact, 100 = very loose)
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Preview */}
+            <div style={{ flex: 1 }}>
+              <h4>Preview ({width}×{height})</h4>
+              <canvas
+                ref={previewCanvasRef}
+                onClick={handlePreviewClick}
+                style={{
+                  border: '2px solid #ccc', maxWidth: '100%', maxHeight: 400,
+                  display: 'block', cursor: makeTransparent ? 'crosshair' : 'default',
+                }}
+              />
+              <p style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
+                Near-black pixels will be skipped (transparent)
+                {makeTransparent && <><br />Click on preview to pick a color to remove</>}
+              </p>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ─── WLED Export Modal ───────────────────────────── */}
+      <Modal
+        title={`Frame ${currentFrame + 1} as WLED JSON`}
+        open={exportModalOpen}
+        width={700}
+        onCancel={() => setExportModalOpen(false)}
+        footer={[
+          <Button key="copy" icon={<CopyOutlined />} type="primary" onClick={() => {
+            navigator.clipboard.writeText(exportedWledJson);
+            message.success('Copied to clipboard');
+          }}>Copy to Clipboard</Button>,
+          <Button key="close" onClick={() => setExportModalOpen(false)}>Close</Button>,
+        ]}
+      >
+        <p style={{ color: '#666', marginBottom: 10 }}>
+          Copy this WLED JSON to use with WLED devices:
+        </p>
+        <Input.TextArea readOnly rows={8} value={exportedWledJson}
+          style={{ fontFamily: 'monospace', fontSize: 12 }} />
+      </Modal>
     </div>
   );
 };

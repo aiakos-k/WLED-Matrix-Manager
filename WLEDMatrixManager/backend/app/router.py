@@ -112,6 +112,15 @@ async def discover_ha_devices():
     return {"devices": devices}
 
 
+@router.get("/ha/debug")
+async def ha_debug():
+    """Return diagnostic info about the HA connection and discovery."""
+    from .ha_client import get_ha_client
+
+    client = get_ha_client()
+    return await client.get_diagnostics()
+
+
 # ─── Scenes ──────────────────────────────────────────────────────
 
 

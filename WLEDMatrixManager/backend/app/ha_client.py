@@ -1,12 +1,13 @@
 """
 Home Assistant Supervisor API Client.
-Discovers WLED devices via HA config entries / entity registry.
+Discovers WLED devices via Supervisor proxy, direct Core API, or entity states.
 """
 
 import asyncio
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import aiohttp
@@ -17,48 +18,164 @@ _instance: Optional["HAClient"] = None
 
 
 def get_ha_client() -> "HAClient":
-    """Return the singleton HAClient instance."""
     global _instance
     if _instance is None:
         _instance = HAClient()
     return _instance
 
 
-class HAClient:
-    """Client for Home Assistant Supervisor and WebSocket APIs"""
+def _read_token() -> str:
+    """Read Supervisor token from env or s6 files."""
+    for var in ("SUPERVISOR_TOKEN", "HASSIO_TOKEN"):
+        val = os.getenv(var, "").strip()
+        if val:
+            logger.info(f"Token from ${var} (len={len(val)})")
+            return val
 
+    for var in ("SUPERVISOR_TOKEN", "HASSIO_TOKEN"):
+        p = Path(f"/run/s6/container_environment/{var}")
+        if p.exists():
+            val = p.read_text().strip()
+            if val:
+                logger.info(f"Token from {p} (len={len(val)})")
+                return val
+
+    logger.warning("No supervisor token found")
+    return ""
+
+
+class HAClient:
     def __init__(self):
-        self.ws_url = "ws://supervisor/core/websocket"
-        self.api_url = "http://supervisor/core/api"
         self.session: Optional[aiohttp.ClientSession] = None
         self.ws: Optional[aiohttp.ClientWebSocketResponse] = None
         self.connected = False
+        self.authenticated = False
         self.auth_token: str = ""
+        self.core_token: str = ""  # might differ from auth_token
         self._message_id = 0
         self._pending: Dict[int, asyncio.Future] = {}
-
-    @property
-    def _headers(self):
-        return {"Authorization": f"Bearer {self.auth_token}"}
+        self._auth_event = asyncio.Event()
+        self._core_api_url: str = ""  # discovered at runtime
 
     async def connect(self) -> bool:
-        """Connect to Home Assistant WebSocket API"""
-        try:
-            self.auth_token = os.getenv("SUPERVISOR_TOKEN", "")
-            if not self.auth_token:
-                logger.warning("No SUPERVISOR_TOKEN found — running outside HA?")
-                return False
-
-            self.session = aiohttp.ClientSession()
-            self.ws = await self.session.ws_connect(self.ws_url)
-            self.connected = True
-            asyncio.create_task(self._listen())
-            logger.info("Connected to Home Assistant")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to connect to HA: {e}")
-            self.connected = False
+        """Connect and discover the working Core API access method."""
+        self.auth_token = _read_token()
+        if not self.auth_token:
             return False
+
+        headers = {"Authorization": f"Bearer {self.auth_token}"}
+
+        # Step 1: Get our addon info from Supervisor
+        addon_info = await self._supervisor_get("/addons/self/info")
+        if addon_info:
+            data = addon_info.get("data", {})
+            logger.info(
+                f"Addon info: homeassistant_api={data.get('homeassistant_api')}, "
+                f"hassio_api={data.get('hassio_api')}, "
+                f"ingress={data.get('ingress')}, "
+                f"slug={data.get('slug')}"
+            )
+        else:
+            logger.warning("Could not get addon self info")
+
+        # Step 2: Try to find a working Core API URL
+        core_urls = [
+            "http://supervisor/core/api",
+            "http://supervisor/homeassistant/api",
+        ]
+
+        for url in core_urls:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        f"{url}/config",
+                        headers=headers,
+                        timeout=aiohttp.ClientTimeout(total=5),
+                    ) as resp:
+                        logger.info(f"Core API probe {url}/config: {resp.status}")
+                        if resp.status == 200:
+                            self._core_api_url = url
+                            self.core_token = self.auth_token
+                            break
+            except Exception as e:
+                logger.error(f"Core API probe {url}: {e}")
+
+        # Step 3: If no proxy works, try getting an ingress session/token
+        if not self._core_api_url:
+            logger.warning(
+                "Core API proxy not accessible - trying to create ingress token"
+            )
+            # Try getting a short-lived token from Supervisor
+            token_resp = await self._supervisor_post(
+                "/auth/token", data=None
+            )
+            if token_resp:
+                logger.info(f"Auth token response: {list(token_resp.keys())}")
+
+        # Step 4: Try direct Core connection
+        if not self._core_api_url:
+            for host in ("homeassistant", "core", "localhost"):
+                url = f"http://{host}:8123/api"
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            f"{url}/config",
+                            headers=headers,
+                            timeout=aiohttp.ClientTimeout(total=3),
+                        ) as resp:
+                            logger.info(
+                                f"Direct Core probe {url}/config: {resp.status}"
+                            )
+                            if resp.status == 200:
+                                self._core_api_url = url
+                                self.core_token = self.auth_token
+                                break
+                except Exception as e:
+                    logger.debug(f"Direct Core {host}: {e}")
+
+        if self._core_api_url:
+            logger.info(f"Core API accessible at: {self._core_api_url}")
+        else:
+            logger.error("Core API NOT accessible via any method!")
+
+        # Step 5: Try WS connection
+        ws_urls = [
+            "ws://supervisor/core/websocket",
+            "ws://homeassistant:8123/api/websocket",
+        ]
+        for ws_url in ws_urls:
+            try:
+                self.session = aiohttp.ClientSession()
+                self.ws = await self.session.ws_connect(
+                    ws_url, timeout=aiohttp.ClientTimeout(total=5)
+                )
+                self.connected = True
+                self._auth_event.clear()
+                asyncio.create_task(self._listen())
+
+                try:
+                    await asyncio.wait_for(self._auth_event.wait(), timeout=10)
+                except asyncio.TimeoutError:
+                    pass
+
+                if self.authenticated:
+                    logger.info(f"WS authenticated via {ws_url}")
+                    break
+                else:
+                    logger.warning(f"WS auth failed at {ws_url}")
+                    await self.session.close()
+                    self.connected = False
+            except Exception as e:
+                logger.debug(f"WS {ws_url}: {e}")
+                if self.session:
+                    await self.session.close()
+                self.connected = False
+
+        logger.info(
+            f"Connection result: core_api={'OK' if self._core_api_url else 'FAIL'}, "
+            f"ws={'OK' if self.authenticated else 'FAIL'}"
+        )
+        return bool(self._core_api_url) or self.authenticated
 
     async def disconnect(self):
         try:
@@ -67,189 +184,391 @@ class HAClient:
             if self.session:
                 await self.session.close()
             self.connected = False
+            self.authenticated = False
         except Exception as e:
             logger.error(f"Disconnect error: {e}")
 
+    # --- Supervisor API (always works) ---
+
+    async def _supervisor_get(self, path: str) -> Optional[Dict]:
+        """GET from Supervisor API (uses hassio_api role)."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"http://supervisor{path}",
+                    headers={"Authorization": f"Bearer {self.auth_token}"},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+                    logger.error(f"Supervisor GET {path}: {resp.status}")
+                    return None
+        except Exception as e:
+            logger.error(f"Supervisor GET {path}: {e}")
+            return None
+
+    async def _supervisor_post(
+        self, path: str, data: Optional[Dict]
+    ) -> Optional[Dict]:
+        """POST to Supervisor API."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"http://supervisor{path}",
+                    headers={
+                        "Authorization": f"Bearer {self.auth_token}",
+                        "Content-Type": "application/json",
+                    },
+                    json=data or {},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+                    body = await resp.text()
+                    logger.error(
+                        f"Supervisor POST {path}: {resp.status} {body[:200]}"
+                    )
+                    return None
+        except Exception as e:
+            logger.error(f"Supervisor POST {path}: {e}")
+            return None
+
+    # --- Core API (discovered at runtime) ---
+
+    async def _core_get(self, path: str) -> Optional[Any]:
+        """GET from HA Core API (using whichever method works)."""
+        if not self._core_api_url:
+            return None
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self._core_api_url}{path}",
+                    headers={
+                        "Authorization": f"Bearer {self.core_token}"
+                    },
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+                    logger.error(
+                        f"Core GET {path}: {resp.status}"
+                    )
+                    return None
+        except Exception as e:
+            logger.error(f"Core GET {path}: {e}")
+            return None
+
+    # --- WebSocket ---
+
     async def _listen(self):
-        """Listen for WS messages and dispatch to pending futures."""
         try:
             async for msg in self.ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     data = json.loads(msg.data)
                     msg_type = data.get("type")
-
                     if msg_type == "auth_required":
+                        logger.info(f"WS auth_required (HA {data.get('ha_version', '?')})")
                         await self._authenticate()
                     elif msg_type == "auth_ok":
-                        logger.info("HA auth successful")
+                        self.authenticated = True
+                        self._auth_event.set()
                     elif msg_type == "auth_invalid":
-                        logger.error("HA auth failed")
-                        self.connected = False
+                        logger.error(f"WS auth_invalid: {data.get('message', '?')}")
+                        self.authenticated = False
+                        self._auth_event.set()
                     elif msg_type == "result":
-                        msg_id = data.get("id")
-                        if msg_id in self._pending:
-                            self._pending[msg_id].set_result(data)
-                            del self._pending[msg_id]
+                        mid = data.get("id")
+                        if mid in self._pending:
+                            self._pending[mid].set_result(data)
+                            del self._pending[mid]
+                elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                    break
         except Exception as e:
-            logger.error(f"WS listen error: {e}")
-            self.connected = False
+            logger.error(f"WS listen: {e}")
+        self.connected = False
+        self.authenticated = False
 
     async def _authenticate(self):
         if self.ws:
-            await self.ws.send_json({"type": "auth", "access_token": self.auth_token})
+            # Try SUPERVISOR_TOKEN first
+            await self.ws.send_json({
+                "type": "auth",
+                "access_token": self.auth_token,
+            })
 
     async def _send_ws(self, payload: dict) -> Optional[dict]:
-        """Send a WS message and wait for result."""
-        if not self.ws or not self.connected:
+        if not self.ws or not self.authenticated:
             return None
         self._message_id += 1
-        msg_id = self._message_id
-        payload["id"] = msg_id
-
-        future = asyncio.get_event_loop().create_future()
-        self._pending[msg_id] = future
-
+        mid = self._message_id
+        payload["id"] = mid
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+        self._pending[mid] = future
         await self.ws.send_json(payload)
         try:
             return await asyncio.wait_for(future, timeout=10)
         except asyncio.TimeoutError:
-            self._pending.pop(msg_id, None)
-            logger.error(f"WS request {msg_id} timed out")
+            self._pending.pop(mid, None)
             return None
 
+    # --- State/Entity access ---
+
     async def get_states(self) -> List[Dict]:
-        """Get all entity states via REST API."""
-        try:
-            if not self.auth_token:
-                return []
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"{self.api_url}/states",
-                    headers=self._headers,
-                    timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
-                    if resp.status == 200:
-                        return await resp.json()
-                    logger.error(f"Failed to get states: {resp.status}")
-                    return []
-        except Exception as e:
-            logger.error(f"Error getting states: {e}")
-            return []
+        result = await self._core_get("/states")
+        return result if isinstance(result, list) else []
+
+    async def get_config_entries(self) -> List[Dict]:
+        # Try WS first (more detailed, has data.host)
+        if self.authenticated:
+            resp = await self._send_ws({"type": "config_entries/get"})
+            if resp and resp.get("success"):
+                return resp.get("result", [])
+
+        # Fallback to REST
+        result = await self._core_get("/config/config_entries/entry")
+        return result if isinstance(result, list) else []
+
+    # --- WLED Discovery ---
 
     async def discover_wled_devices(self) -> List[Dict]:
-        """
-        Discover WLED devices using HA config entries (reliable IP) +
-        entity registry + states.  Falls back to state-based search.
-        """
-        # --- Try config-entry approach first (most reliable for IP) ---
-        entries_resp = await self._send_ws({"type": "config_entries/get"})
-        if entries_resp and entries_resp.get("success"):
-            return await self._discover_from_config_entries(entries_resp)
+        logger.info(
+            f"Discovery (core_api={'OK' if self._core_api_url else 'NONE'}, "
+            f"ws={self.authenticated})"
+        )
 
-        # --- Fallback: scan entity states ---
-        return await self._discover_from_states()
+        # Strategy 1: Config entries (best — has IP in data.host)
+        entries = await self.get_config_entries()
+        if entries:
+            wled = [e for e in entries if e.get("domain") == "wled"]
+            if wled:
+                logger.info(f"Found {len(wled)} WLED config entries")
+                return await self._from_entries(wled)
 
-    async def _discover_from_config_entries(self, entries_resp: dict) -> List[Dict]:
-        """Use config entries + entity registry for accurate IP discovery."""
-        wled_entries: Dict[str, Dict] = {}
-        for entry in entries_resp.get("result", []):
-            if entry.get("domain") == "wled":
-                wled_entries[entry["entry_id"]] = {
-                    "host": entry.get("data", {}).get("host", ""),
-                    "title": entry.get("title", ""),
-                }
+        # Strategy 2: Supervisor API — get HA config then states
+        # (hassio_api works, so try to get data through Supervisor)
+        devices = await self._discover_via_supervisor()
+        if devices:
+            return devices
 
-        if not wled_entries:
-            return []
+        # Strategy 3: Broad state scan
+        return await self._from_states()
 
-        # Map config_entry_id → light entity
-        entity_resp = await self._send_ws({"type": "config/entity_registry/list"})
-        entry_entities: Dict[str, str] = {}  # entry_id → entity_id (light.*)
-        if entity_resp and entity_resp.get("success"):
-            for ent in entity_resp.get("result", []):
-                ce_id = ent.get("config_entry_id")
-                eid = ent.get("entity_id", "")
-                if ce_id in wled_entries and eid.startswith("light."):
-                    entry_entities.setdefault(ce_id, eid)
+    async def _from_entries(self, wled_entries: List[Dict]) -> List[Dict]:
+        entries_map: Dict[str, Dict] = {}
+        for e in wled_entries:
+            eid = e.get("entry_id", "")
+            entries_map[eid] = {
+                "host": e.get("data", {}).get("host", ""),
+                "title": e.get("title", ""),
+            }
+            logger.info(
+                f"  Entry: {e.get('title')} host={e.get('data', {}).get('host', '?')}"
+            )
 
-        # Fetch all states for friendly_name / on-off
+        # Resolve entity IDs
+        entity_map: Dict[str, str] = {}
+        if self.authenticated:
+            resp = await self._send_ws({"type": "config/entity_registry/list"})
+            if resp and resp.get("success"):
+                for ent in resp.get("result", []):
+                    ce = ent.get("config_entry_id", "")
+                    eid = ent.get("entity_id", "")
+                    if ce in entries_map and eid.startswith("light."):
+                        entity_map.setdefault(ce, eid)
+
         states = await self.get_states()
         state_map = {s["entity_id"]: s for s in states}
 
         devices: List[Dict] = []
-        for entry_id, info in wled_entries.items():
-            entity_id = entry_entities.get(entry_id, "")
-            state = state_map.get(entity_id, {})
+        for entry_id, info in entries_map.items():
+            eid = entity_map.get(entry_id, "")
+            state = state_map.get(eid, {})
             attrs = state.get("attributes", {})
-            devices.append(
-                {
-                    "entity_id": entity_id,
-                    "name": attrs.get("friendly_name", info["title"]),
-                    "ip_address": info["host"],
-                    "state": state.get("state", "unknown"),
-                    "attributes": attrs,
-                }
+            ip = info["host"] or attrs.get("ip_address", "") or ""
+            devices.append({
+                "entity_id": eid,
+                "name": attrs.get("friendly_name", info["title"]),
+                "ip_address": ip,
+                "state": state.get("state", "unknown"),
+                "attributes": attrs,
+            })
+        logger.info(f"Config entries -> {len(devices)} devices")
+        return devices
+
+    async def _discover_via_supervisor(self) -> List[Dict]:
+        """Use the Supervisor API (which works) to discover WLED."""
+        # The Supervisor can proxy service calls
+        # Try getting HA services info
+        services = await self._supervisor_get("/services")
+        if services:
+            logger.info(f"Supervisor services: {list(services.get('data', {}).keys()) if isinstance(services.get('data'), dict) else '?'}")
+
+        # Try if Supervisor exposes any entity info
+        core_info = await self._supervisor_get("/core/info")
+        if core_info:
+            data = core_info.get("data", {})
+            logger.info(
+                f"Core info: version={data.get('version')}, "
+                f"state={data.get('state')}"
             )
 
-        logger.info(f"Found {len(devices)} WLED devices via config entries")
+        return []  # Supervisor doesn't expose entity data
+
+    async def _from_states(self) -> List[Dict]:
+        states = await self.get_states()
+        logger.info(f"State scan: {len(states)} entities")
+
+        devices: List[Dict] = []
+        seen: set = set()
+
+        for entity in states:
+            eid = entity.get("entity_id", "")
+            attrs = entity.get("attributes", {})
+
+            if not eid.startswith("light."):
+                continue
+
+            is_wled = False
+            if "wled" in eid:
+                is_wled = True
+            elif "wled" in attrs.get("friendly_name", "").lower():
+                is_wled = True
+            elif isinstance(attrs.get("effect_list"), list):
+                effects = set(attrs["effect_list"])
+                if len({"Solid", "Blink", "Breathe", "Rainbow", "Fire 2012"} & effects) >= 3:
+                    is_wled = True
+
+            if is_wled and eid not in seen:
+                seen.add(eid)
+                ip = attrs.get("ip_address") or attrs.get("host", "")
+                devices.append({
+                    "entity_id": eid,
+                    "name": attrs.get("friendly_name", eid),
+                    "ip_address": ip,
+                    "state": entity.get("state", "unknown"),
+                    "attributes": attrs,
+                })
+                logger.info(f"  Found: {eid} ip={ip}")
+
+        logger.info(f"State scan: {len(devices)} WLED devices")
         return devices
 
-    async def _discover_from_states(self) -> List[Dict]:
-        """Fallback: discover WLED devices from entity states."""
+    # --- Diagnostics ---
+
+    async def get_diagnostics(self) -> Dict[str, Any]:
+        diag: Dict[str, Any] = {
+            "token_len": len(self.auth_token),
+            "core_api_url": self._core_api_url or "NOT_FOUND",
+            "ws_authenticated": self.authenticated,
+        }
+
+        # Addon self info (permissions)
+        addon_info = await self._supervisor_get("/addons/self/info")
+        if addon_info:
+            d = addon_info.get("data", {})
+            diag["addon_permissions"] = {
+                "homeassistant_api": d.get("homeassistant_api"),
+                "hassio_api": d.get("hassio_api"),
+                "ingress": d.get("ingress"),
+                "slug": d.get("slug"),
+                "state": d.get("state"),
+                "version": d.get("version"),
+            }
+        else:
+            diag["addon_permissions"] = "FAILED_TO_GET"
+
+        # Supervisor connectivity
+        ping = await self._supervisor_get("/supervisor/ping")
+        diag["supervisor_ping"] = "ok" if ping else "failed"
+
+        # Core info
+        core_info = await self._supervisor_get("/core/info")
+        if core_info:
+            d = core_info.get("data", {})
+            diag["core_info"] = {
+                "version": d.get("version"),
+                "state": d.get("state"),
+            }
+
+        # Probe all possible Core API URLs
+        probe_urls = [
+            "http://supervisor/core/api",
+            "http://supervisor/homeassistant/api",
+            "http://homeassistant:8123/api",
+            "http://core:8123/api",
+        ]
+        diag["core_api_probes"] = {}
+        headers = {"Authorization": f"Bearer {self.auth_token}"}
+        for url in probe_urls:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        f"{url}/config",
+                        headers=headers,
+                        timeout=aiohttp.ClientTimeout(total=3),
+                    ) as resp:
+                        diag["core_api_probes"][url] = resp.status
+            except Exception as e:
+                diag["core_api_probes"][url] = str(e)
+
+        # States count
         states = await self.get_states()
-        devices: List[Dict] = []
-        for entity in states:
-            entity_id = entity.get("entity_id", "")
-            attrs = entity.get("attributes", {})
-            if entity_id.startswith("light.wled"):
-                ip = attrs.get("ip_address") or attrs.get("host", "")
-                devices.append(
-                    {
-                        "entity_id": entity_id,
-                        "name": attrs.get("friendly_name", entity_id),
-                        "ip_address": ip,
-                        "state": entity.get("state", "unknown"),
-                        "attributes": attrs,
-                    }
-                )
-        logger.info(f"Found {len(devices)} WLED devices via states fallback")
-        return devices
+        diag["total_entities"] = len(states)
+        lights = [s for s in states if s.get("entity_id", "").startswith("light.")]
+        diag["light_count"] = len(lights)
+        diag["light_ids"] = [s["entity_id"] for s in lights]
+
+        # Config entries
+        entries = await self.get_config_entries()
+        if entries:
+            wled = [e for e in entries if e.get("domain") == "wled"]
+            diag["wled_entries"] = [
+                {"title": e.get("title"), "host": e.get("data", {}).get("host", "?")}
+                for e in wled
+            ]
+        else:
+            diag["wled_entries"] = []
+
+        # Environment
+        diag["env"] = {
+            "SUPERVISOR_TOKEN": bool(os.getenv("SUPERVISOR_TOKEN")),
+            "HASSIO_TOKEN": bool(os.getenv("HASSIO_TOKEN")),
+            "s6_SUPERVISOR_TOKEN": Path(
+                "/run/s6/container_environment/SUPERVISOR_TOKEN"
+            ).exists(),
+        }
+
+        return diag
+
+    # --- Message handler ---
 
     async def handle_message(self, data: str) -> dict:
-        """Handle incoming message from frontend WebSocket."""
         try:
             msg = json.loads(data)
             action = msg.get("action")
-
             if action == "discover_devices":
-                devices = await self.discover_wled_devices()
-                return {"type": "devices", "data": devices}
+                return {"type": "devices", "data": await self.discover_wled_devices()}
             elif action == "get_states":
-                states = await self.get_states()
-                return {"type": "states", "data": states}
+                return {"type": "states", "data": await self.get_states()}
             elif action == "call_service":
                 return await self._call_service(msg)
             else:
-                return {"type": "error", "message": f"Unknown action: {action}"}
-        except json.JSONDecodeError:
-            return {"type": "error", "message": "Invalid JSON"}
+                return {"type": "error", "message": f"Unknown: {action}"}
         except Exception as e:
             return {"type": "error", "message": str(e)}
 
     async def _call_service(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Call a Home Assistant service."""
         domain = data.get("domain")
         service = data.get("service")
         if not domain or not service:
-            return {"error": "Missing domain or service"}
-        resp = await self._send_ws(
-            {
-                "type": "call_service",
-                "domain": domain,
-                "service": service,
-                "service_data": data.get("data", {}),
-            }
-        )
+            return {"error": "Missing domain/service"}
+        resp = await self._send_ws({
+            "type": "call_service",
+            "domain": domain,
+            "service": service,
+            "service_data": data.get("data", {}),
+        })
         if resp and resp.get("success"):
             return {"type": "result", "success": True}
         return {"type": "error", "message": "Service call failed"}

@@ -52,14 +52,14 @@ Wenn du DevContainer nicht nutzen möchtest:
 
 ```bash
 # Backend starten (Terminal 1)
-cd example/backend
+cd WLEDMatrixManager/backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python main.py
 
 # Frontend starten (Terminal 2)
-cd example/frontend
+cd WLEDMatrixManager/frontend
 npm install
 npm run dev
 ```
@@ -95,8 +95,8 @@ Der React Dashboard zeigt:
 
 Die Backend & Frontend laufen im **Watch-Modus**:
 
-- Backend: Bearbeite `example/backend/app/*.py` → Automatisch Reload
-- Frontend: Bearbeite `example/frontend/src/**` → Hot Module Reload
+- Backend: Bearbeite `WLEDMatrixManager/backend/app/*.py` → Automatisch Reload
+- Frontend: Bearbeite `WLEDMatrixManager/frontend/src/**` → Hot Module Reload
 
 ### Mit Home Assistant verbinden
 
@@ -106,7 +106,7 @@ Das Add-on verbindet sich automatisch zu Home Assistant über:
 ws://supervisor/core/websocket
 ```
 
-Code: `example/backend/app/ha_client.py`
+Code: `WLEDMatrixManager/backend/app/ha_client.py`
 
 ---
 
@@ -141,14 +141,14 @@ Code: `example/backend/app/ha_client.py`
 
 ## 📂 Wichtige Dateien
 
-| Datei                                | Purpose                     |
-| ------------------------------------ | --------------------------- |
-| `example/backend/main.py`            | FastAPI Application Entry   |
-| `example/backend/app/ha_client.py`   | HA WebSocket Client         |
-| `example/frontend/src/App.tsx`       | React App                   |
-| `example/frontend/src/api/client.ts` | Frontend API Client         |
-| `example/config.yaml`                | Add-on Konfiguration        |
-| `.devcontainer.json`                 | VS Code DevContainer Config |
+| Datei                                           | Purpose                     |
+| ----------------------------------------------- | --------------------------- |
+| `WLEDMatrixManager/backend/main.py`              | FastAPI Application Entry   |
+| `WLEDMatrixManager/backend/app/ha_client.py`     | HA WebSocket Client         |
+| `WLEDMatrixManager/frontend/src/App.tsx`          | React App                   |
+| `WLEDMatrixManager/frontend/src/api/client.ts`   | Frontend API Client         |
+| `WLEDMatrixManager/config.yaml`                   | Add-on Konfiguration        |
+| `.devcontainer.json`                               | VS Code DevContainer Config |
 
 ---
 
@@ -175,13 +175,43 @@ pip install -r requirements.txt
 curl http://localhost:8000/health
 
 # Frontend neu bauen (wichtig: vite.config.ts muss base: './' haben!)
-cd example/frontend && npm run build
+cd WLEDMatrixManager/frontend && npm run build
 
 # Add-on neu starten
 ./dev.sh start:addon
 ```
 
 → Details zu Ingress-Routing siehe [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md)
+
+### Onboarding: "Failed to save: Unknown error"
+
+Der DevContainer patcht den Supervisor automatisch beim Start. Falls das fehlschlägt
+(z.B. nach Supervisor-Update), den Patch manuell anwenden:
+
+```bash
+# 1. Patch anwenden
+docker exec hassio_supervisor python3 -c "
+path = '/usr/src/supervisor/supervisor/api/supervisor.py'
+with open(path, 'r') as f:
+    content = f.read()
+old = '        if ATTR_DIAGNOSTICS in body:\\n            self.sys_config.diagnostics = body[ATTR_DIAGNOSTICS]\\n            await self.sys_dbus.agent.set_diagnostics(body[ATTR_DIAGNOSTICS])'
+new = '        if ATTR_DIAGNOSTICS in body:\\n            self.sys_config.diagnostics = body[ATTR_DIAGNOSTICS]\\n            try:\\n                await self.sys_dbus.agent.set_diagnostics(body[ATTR_DIAGNOSTICS])\\n            except Exception:\\n                pass'
+if old in content:
+    with open(path, 'w') as f:
+        f.write(content.replace(old, new))
+    print('PATCHED')
+else:
+    print('already patched or pattern changed')
+"
+
+# 2. Supervisor-Prozess neustarten (NICHT 'ha supervisor restart' — das löscht den Patch!)
+docker exec hassio_supervisor pkill -f 'python3 -m supervisor'
+
+# 3. 10 Sekunden warten, dann Onboarding erneut versuchen
+```
+
+> **Wichtig:** `ha supervisor restart` erstellt den Container neu und löscht alle Patches.
+> Stattdessen immer `pkill` innerhalb des Containers verwenden.
 
 ### "Port already in use"
 

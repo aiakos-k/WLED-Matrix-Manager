@@ -5,6 +5,7 @@ from __future__ import annotations
 import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import CONF_HOST, CONF_PORT, DEFAULT_HOST, DEFAULT_PORT, DOMAIN
@@ -37,6 +38,8 @@ class WLEDMatrixManagerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             data=user_input,
                         )
                     errors["base"] = "cannot_connect"
+            except AbortFlow:
+                raise
             except Exception:
                 errors["base"] = "cannot_connect"
 

@@ -55,7 +55,7 @@ async def async_setup_entry(
 
 
 class WLEDSceneSwitch(CoordinatorEntity[WLEDMatrixCoordinator], SwitchEntity):
-    """A switch that starts/stops a WLED scene."""
+    """A switch that starts/stops a WLED-MM scene."""
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:led-strip-variant"

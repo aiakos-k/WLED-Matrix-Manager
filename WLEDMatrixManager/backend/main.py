@@ -12,6 +12,7 @@ from pathlib import Path
 
 from app.database import init_db
 from app.ha_client import get_ha_client
+from app.ha_entity_sync import get_entity_sync
 from app.router import router
 from app.scene_playback import get_all_playback_status
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -24,6 +25,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 ha_client = get_ha_client()
+entity_sync = get_entity_sync()
 
 # WebSocket clients for live preview broadcast
 ws_clients: set[WebSocket] = set()
@@ -34,8 +36,17 @@ async def lifespan(app: FastAPI):
     logger.info("Starting WLED Matrix Manager")
     await init_db()
     await ha_client.connect()
+
+    # Register all scenes as HA entities
+    await entity_sync.start()
+    try:
+        await entity_sync.sync_all_scenes()
+    except Exception as e:
+        logger.warning(f"Entity sync on startup: {e}")
+
     yield
     logger.info("Shutting down WLED Matrix Manager")
+    await entity_sync.stop()
     await ha_client.disconnect()
 
 

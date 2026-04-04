@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from .binary_format import binary_to_scene, scene_to_binary
 from .database import get_session
 from .device_controller import DeviceController
+from .ha_entity_sync import get_entity_sync
 from .models import (
     Device,
     DeviceCreate,
@@ -240,6 +241,20 @@ async def create_scene(data: SceneCreate, db: AsyncSession = Depends(get_session
     await db.commit()
     await db.refresh(scene, ["frames", "devices"])
 
+    # Register as HA entity
+    try:
+        await get_entity_sync().register_scene(
+            scene_id=scene.id,
+            name=scene.name,
+            frame_count=len(scene.frames),
+            matrix_width=scene.matrix_width,
+            matrix_height=scene.matrix_height,
+            loop_mode=scene.loop_mode,
+            device_count=len(scene.devices),
+        )
+    except Exception as e:
+        logger.warning(f"Entity sync on create: {e}")
+
     return SceneResponse(
         id=scene.id,
         name=scene.name,
@@ -318,6 +333,20 @@ async def update_scene(
     await db.commit()
     await db.refresh(scene, ["frames", "devices"])
 
+    # Update HA entity
+    try:
+        await get_entity_sync().register_scene(
+            scene_id=scene.id,
+            name=scene.name,
+            frame_count=len(scene.frames),
+            matrix_width=scene.matrix_width,
+            matrix_height=scene.matrix_height,
+            loop_mode=scene.loop_mode,
+            device_count=len(scene.devices),
+        )
+    except Exception as e:
+        logger.warning(f"Entity sync on update: {e}")
+
     return SceneResponse(
         id=scene.id,
         name=scene.name,
@@ -351,6 +380,13 @@ async def delete_scene(scene_id: int, db: AsyncSession = Depends(get_session)):
         raise HTTPException(404, "Scene not found")
     scene.is_active = False
     await db.commit()
+
+    # Remove HA entity
+    try:
+        await get_entity_sync().remove_scene(scene_id)
+    except Exception as e:
+        logger.warning(f"Entity sync on delete: {e}")
+
     return {"success": True}
 
 
@@ -406,12 +442,26 @@ async def play_scene(
     ]
 
     start_scene_playback(scene.id, devices_info, frames_data, scene.loop_mode)
+
+    # Update HA entity state to "on"
+    try:
+        await get_entity_sync().update_scene_playing(scene.id, True)
+    except Exception as e:
+        logger.warning(f"Entity sync on play: {e}")
+
     return {"success": True, "scene_id": scene.id}
 
 
 @router.post("/scenes/{scene_id}/stop")
 async def stop_scene(scene_id: int):
     stop_scene_playback(scene_id)
+
+    # Update HA entity state to "off"
+    try:
+        await get_entity_sync().update_scene_playing(scene_id, False)
+    except Exception as e:
+        logger.warning(f"Entity sync on stop: {e}")
+
     return {"success": True}
 
 
@@ -546,6 +596,20 @@ async def import_scene(
 
     await db.commit()
     await db.refresh(scene, ["frames"])
+
+    # Register imported scene as HA entity
+    try:
+        await get_entity_sync().register_scene(
+            scene_id=scene.id,
+            name=scene.name,
+            frame_count=len(scene.frames),
+            matrix_width=scene.matrix_width,
+            matrix_height=scene.matrix_height,
+            loop_mode=scene.loop_mode,
+        )
+    except Exception as e:
+        logger.warning(f"Entity sync on import: {e}")
+
     return {"success": True, "scene_id": scene.id, "name": scene.name}
 
 

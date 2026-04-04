@@ -198,6 +198,17 @@ class ScenePlayback:
                     loop.close()
                 except Exception:
                     pass
+            # Update HA entity state to "off"
+            try:
+                from app.ha_entity_sync import get_entity_sync
+
+                loop = asyncio.new_event_loop()
+                loop.run_until_complete(
+                    get_entity_sync().update_scene_playing(self.scene_id, False)
+                )
+                loop.close()
+            except Exception as e:
+                logger.debug(f"Entity sync on playback end: {e}")
             with playback_lock:
                 active_playbacks.pop(self.scene_id, None)
 

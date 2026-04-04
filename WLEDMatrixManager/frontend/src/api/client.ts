@@ -3,7 +3,10 @@
  * No auth required — Home Assistant handles authorization.
  */
 
-const BASE = "/api";
+// Compute the API base path once at load time.
+// In HA ingress the page is served at /api/hassio_ingress/<token>/
+// so API calls must go through the same prefix.
+const BASE = window.location.pathname.replace(/\/$/, "") + "/api";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE}${path}`;

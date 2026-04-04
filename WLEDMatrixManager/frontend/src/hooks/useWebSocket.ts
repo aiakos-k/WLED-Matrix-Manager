@@ -1,9 +1,8 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 
-const isProd = import.meta.env.MODE === "production";
-const WS_URL = isProd
-  ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}${window.location.pathname.replace(/\/$/, "")}/ws`
-  : "ws://localhost:8000/ws";
+// Always compute WS URL from the current location so it works
+// both in HA ingress (/api/hassio_ingress/TOKEN/ws) and local dev.
+const WS_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}${window.location.pathname.replace(/\/$/, "")}/ws`;
 
 type MessageHandler = (data: unknown) => void;
 

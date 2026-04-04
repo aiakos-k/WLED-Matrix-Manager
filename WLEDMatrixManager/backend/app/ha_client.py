@@ -1,6 +1,6 @@
 """
 Home Assistant Supervisor API Client.
-Discovers WLED devices via HA entity registry and forwards WebSocket messages.
+Discovers WLED devices via HA config entries / entity registry.
 """
 
 import asyncio
@@ -12,6 +12,16 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 
 logger = logging.getLogger(__name__)
+
+_instance: Optional["HAClient"] = None
+
+
+def get_ha_client() -> "HAClient":
+    """Return the singleton HAClient instance."""
+    global _instance
+    if _instance is None:
+        _instance = HAClient()
+    return _instance
 
 
 class HAClient:
@@ -127,30 +137,83 @@ class HAClient:
             return []
 
     async def discover_wled_devices(self) -> List[Dict]:
-        """Discover WLED devices from Home Assistant entities."""
-        states = await self.get_states()
-        wled_devices = []
+        """
+        Discover WLED devices using HA config entries (reliable IP) +
+        entity registry + states.  Falls back to state-based search.
+        """
+        # --- Try config-entry approach first (most reliable for IP) ---
+        entries_resp = await self._send_ws({"type": "config_entries/get"})
+        if entries_resp and entries_resp.get("success"):
+            return await self._discover_from_config_entries(entries_resp)
 
+        # --- Fallback: scan entity states ---
+        return await self._discover_from_states()
+
+    async def _discover_from_config_entries(self, entries_resp: dict) -> List[Dict]:
+        """Use config entries + entity registry for accurate IP discovery."""
+        wled_entries: Dict[str, Dict] = {}
+        for entry in entries_resp.get("result", []):
+            if entry.get("domain") == "wled":
+                wled_entries[entry["entry_id"]] = {
+                    "host": entry.get("data", {}).get("host", ""),
+                    "title": entry.get("title", ""),
+                }
+
+        if not wled_entries:
+            return []
+
+        # Map config_entry_id → light entity
+        entity_resp = await self._send_ws({"type": "config/entity_registry/list"})
+        entry_entities: Dict[str, str] = {}  # entry_id → entity_id (light.*)
+        if entity_resp and entity_resp.get("success"):
+            for ent in entity_resp.get("result", []):
+                ce_id = ent.get("config_entry_id")
+                eid = ent.get("entity_id", "")
+                if ce_id in wled_entries and eid.startswith("light."):
+                    entry_entities.setdefault(ce_id, eid)
+
+        # Fetch all states for friendly_name / on-off
+        states = await self.get_states()
+        state_map = {s["entity_id"]: s for s in states}
+
+        devices: List[Dict] = []
+        for entry_id, info in wled_entries.items():
+            entity_id = entry_entities.get(entry_id, "")
+            state = state_map.get(entity_id, {})
+            attrs = state.get("attributes", {})
+            devices.append(
+                {
+                    "entity_id": entity_id,
+                    "name": attrs.get("friendly_name", info["title"]),
+                    "ip_address": info["host"],
+                    "state": state.get("state", "unknown"),
+                    "attributes": attrs,
+                }
+            )
+
+        logger.info(f"Found {len(devices)} WLED devices via config entries")
+        return devices
+
+    async def _discover_from_states(self) -> List[Dict]:
+        """Fallback: discover WLED devices from entity states."""
+        states = await self.get_states()
+        devices: List[Dict] = []
         for entity in states:
             entity_id = entity.get("entity_id", "")
-            attributes = entity.get("attributes", {})
-
-            # Look for WLED light entities
+            attrs = entity.get("attributes", {})
             if entity_id.startswith("light.wled"):
-                ip = attributes.get("ip_address") or attributes.get("host", "")
-                name = attributes.get("friendly_name", entity_id)
-                wled_devices.append(
+                ip = attrs.get("ip_address") or attrs.get("host", "")
+                devices.append(
                     {
                         "entity_id": entity_id,
-                        "name": name,
+                        "name": attrs.get("friendly_name", entity_id),
                         "ip_address": ip,
                         "state": entity.get("state", "unknown"),
-                        "attributes": attributes,
+                        "attributes": attrs,
                     }
                 )
-
-        logger.info(f"Found {len(wled_devices)} WLED devices in HA")
-        return wled_devices
+        logger.info(f"Found {len(devices)} WLED devices via states fallback")
+        return devices
 
     async def handle_message(self, data: str) -> dict:
         """Handle incoming message from frontend WebSocket."""
@@ -164,6 +227,8 @@ class HAClient:
             elif action == "get_states":
                 states = await self.get_states()
                 return {"type": "states", "data": states}
+            elif action == "call_service":
+                return await self._call_service(msg)
             else:
                 return {"type": "error", "message": f"Unknown action: {action}"}
         except json.JSONDecodeError:
@@ -171,57 +236,20 @@ class HAClient:
         except Exception as e:
             return {"type": "error", "message": str(e)}
 
-    async def _authenticate(self):
-        """Authenticate with Home Assistant"""
-        auth_message = {"type": "auth", "access_token": self.auth_token}
-        await self.ws.send_json(auth_message)
-
-    async def handle_message(self, message: str) -> Dict[str, Any]:
-        """Handle message from WebSocket client"""
-        try:
-            data = json.loads(message)
-            action = data.get("action")
-
-            if action == "get_entities":
-                return await self._get_entities()
-            elif action == "call_service":
-                return await self._call_service(data)
-            else:
-                return {"error": "Unknown action"}
-        except Exception as e:
-            logger.error(f"Error handling message: {e}")
-            return {"error": str(e)}
-
-    async def _get_entities(self) -> Dict[str, Any]:
-        """Get list of entities from Home Assistant"""
-        # This would send a get_states request to Home Assistant
-        return {"success": True, "entities": []}
-
     async def _call_service(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Call a Home Assistant service"""
+        """Call a Home Assistant service."""
         domain = data.get("domain")
         service = data.get("service")
-
         if not domain or not service:
             return {"error": "Missing domain or service"}
-
-        # Send service call to Home Assistant
-        message = {
-            "id": self._get_next_message_id(),
-            "type": "call_service",
-            "domain": domain,
-            "service": service,
-            "service_data": data.get("data", {}),
-        }
-
-        try:
-            await self.ws.send_json(message)
-            return {"success": True}
-        except Exception as e:
-            logger.error(f"Failed to call service: {e}")
-            return {"error": str(e)}
-
-    def _get_next_message_id(self) -> int:
-        """Get next message ID"""
-        self._message_id += 1
-        return self._message_id
+        resp = await self._send_ws(
+            {
+                "type": "call_service",
+                "domain": domain,
+                "service": service,
+                "service_data": data.get("data", {}),
+            }
+        )
+        if resp and resp.get("success"):
+            return {"type": "result", "success": True}
+        return {"type": "error", "message": "Service call failed"}

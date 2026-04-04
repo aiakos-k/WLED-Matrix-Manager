@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from app.database import init_db
-from app.ha_client import HAClient
+from app.ha_client import get_ha_client
 from app.router import router
 from app.scene_playback import get_all_playback_status
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-ha_client = HAClient()
+ha_client = get_ha_client()
 
 # WebSocket clients for live preview broadcast
 ws_clients: set[WebSocket] = set()
@@ -106,11 +106,3 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     host = os.getenv("HOST", "0.0.0.0")
     uvicorn.run(app, host=host, port=port, log_level="info")
-
-    uvicorn.run(
-        "main:app",
-        host=host,
-        port=port,
-        reload=os.getenv("ENV") == "development",
-        log_level="info",
-    )

@@ -105,15 +105,11 @@ async def check_device_health(device_id: int, db: AsyncSession = Depends(get_ses
 @router.get("/ha/discover")
 async def discover_ha_devices():
     """Discover WLED devices from Home Assistant."""
-    from app.ha_client import HAClient
+    from .ha_client import get_ha_client
 
-    client = HAClient()
-    await client.connect()
-    try:
-        devices = await client.discover_wled_devices()
-        return {"devices": devices}
-    finally:
-        await client.disconnect()
+    client = get_ha_client()
+    devices = await client.discover_wled_devices()
+    return {"devices": devices}
 
 
 # ─── Scenes ──────────────────────────────────────────────────────

@@ -1,17 +1,20 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Button, Card, Col, Form, Input, InputNumber, message, Modal,
-  Row, Select, Space, Table, Tag, Popconfirm, Spin, Alert,
+  Button, Card, Col, Divider, Form, Input, InputNumber, message, Modal,
+  Row, Select, Space, Table, Tag, Popconfirm, Spin, Alert, Typography,
 } from 'antd';
 import {
   PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined,
   CheckCircleOutlined, CloseCircleOutlined, SyncOutlined,
+  HomeOutlined,
 } from '@ant-design/icons';
 import {
   getDevices, createDevice, updateDevice, deleteDevice,
   checkDeviceHealth, discoverHADevices,
   type DeviceData, type HADevice,
 } from '@/api/client';
+
+const { Text } = Typography;
 
 const PROTOCOLS = [
   { value: 'udp_dnrgb', label: 'UDP DNRGB (Recommended)' },
@@ -30,6 +33,8 @@ const Devices: React.FC = () => {
   const [discovering, setDiscovering] = useState(false);
   const [haDevices, setHaDevices] = useState<HADevice[]>([]);
   const [discoveryOpen, setDiscoveryOpen] = useState(false);
+  const [haLoading, setHaLoading] = useState(false);
+  const [haOptions, setHaOptions] = useState<HADevice[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -66,6 +71,35 @@ const Devices: React.FC = () => {
       return () => clearInterval(interval);
     }
   }, [devices]);
+
+  // ─── Load HA devices for the Select dropdown ──────────
+
+  const loadHAOptions = useCallback(async () => {
+    if (haOptions.length > 0) return; // already loaded
+    setHaLoading(true);
+    try {
+      const result = await discoverHADevices();
+      setHaOptions(result.devices);
+    } catch {
+      // Not running inside HA — silently ignore
+    } finally {
+      setHaLoading(false);
+    }
+  }, [haOptions.length]);
+
+  const onHAEntitySelect = (entityId: string) => {
+    const device = haOptions.find((d) => d.entity_id === entityId);
+    if (device) {
+      const updates: Record<string, unknown> = { ha_entity_id: entityId };
+      if (device.name) updates.name = device.name;
+      if (device.ip_address) updates.ip_address = device.ip_address;
+      form.setFieldsValue(updates);
+    }
+  };
+
+  const onHAEntityClear = () => {
+    form.setFieldsValue({ ha_entity_id: undefined });
+  };
 
   // ─── CRUD ─────────────────────────────────────────────
 
@@ -104,13 +138,14 @@ const Devices: React.FC = () => {
     }
   };
 
-  // ─── HA Discovery ─────────────────────────────────────
+  // ─── HA Discovery Modal ───────────────────────────────
 
   const handleDiscover = async () => {
     setDiscovering(true);
     try {
       const result = await discoverHADevices();
       setHaDevices(result.devices);
+      setHaOptions(result.devices); // also update the inline Select cache
       setDiscoveryOpen(true);
       if (result.devices.length === 0) {
         message.info('No WLED devices found in Home Assistant');
@@ -223,16 +258,50 @@ const Devices: React.FC = () => {
         onOk={handleSave}
         onCancel={() => { setModalOpen(false); setEditDevice(null); form.resetFields(); }}
         okText="Save"
+        width={520}
       >
         <Form form={form} layout="vertical">
+          {/* HA Entity search — auto-fills name + IP */}
+          <Form.Item
+            name="ha_entity_id"
+            label={
+              <Space>
+                <HomeOutlined />
+                <span>Home Assistant Device</span>
+              </Space>
+            }
+            extra="Select a WLED device from HA to auto-fill name and IP"
+          >
+            <Select
+              showSearch
+              allowClear
+              placeholder="Search WLED devices in Home Assistant..."
+              loading={haLoading}
+              onDropdownVisibleChange={(open) => { if (open) loadHAOptions(); }}
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={haOptions.map((d) => ({
+                value: d.entity_id,
+                label: `${d.name}${d.ip_address ? ` (${d.ip_address})` : ''} — ${d.entity_id}`,
+              }))}
+              onChange={(val) => val ? onHAEntitySelect(val) : onHAEntityClear()}
+              notFoundContent={haLoading ? <Spin size="small" /> : 'No WLED devices found'}
+            />
+          </Form.Item>
+
+          <Divider style={{ margin: '8px 0 16px' }} />
+
           <Form.Item name="name" label="Name" rules={[{ required: true }]}>
             <Input placeholder="Living Room Matrix" />
           </Form.Item>
-          <Form.Item name="ip_address" label="IP Address" rules={[{ required: true }]}>
+          <Form.Item
+            name="ip_address"
+            label="IP Address"
+            rules={[{ required: true, message: 'IP address is required for device communication' }]}
+            extra={<Text type="secondary">Required — used for UDP/HTTP communication with WLED</Text>}
+          >
             <Input placeholder="192.168.1.100" />
-          </Form.Item>
-          <Form.Item name="ha_entity_id" label="HA Entity ID">
-            <Input placeholder="light.wled_matrix" />
           </Form.Item>
           <Row gutter={16}>
             <Col span={12}>

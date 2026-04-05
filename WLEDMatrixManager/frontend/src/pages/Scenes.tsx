@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Card, Row, Col, Button, Space, Tag, message, Upload, Popconfirm, Spin } from 'antd';
+import { Card, Row, Col, Button, Space, Tag, Tooltip, message, Upload, Popconfirm, Spin } from 'antd';
 import {
   PlusOutlined,
   PlayCircleOutlined,
@@ -9,6 +9,7 @@ import {
   DeleteOutlined,
   ImportOutlined,
   EyeOutlined,
+  ApiOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -20,6 +21,8 @@ import {
   importScene,
   getPlaybackStatus,
   type SceneData,
+  getDevices,
+  type DeviceData,
 } from '@/api/client';
 
 /** Draw first frame of scene onto a canvas */
@@ -47,12 +50,13 @@ function drawPreview(canvas: HTMLCanvasElement, scene: SceneData) {
 const SceneCard: React.FC<{
   scene: SceneData;
   isPlaying: boolean;
+  deviceNames: string[];
   onPlay: () => void;
   onStop: () => void;
   onEdit: () => void;
   onExport: () => void;
   onDelete: () => void;
-}> = ({ scene, isPlaying, onPlay, onStop, onEdit, onExport, onDelete }) => {
+}> = ({ scene, isPlaying, deviceNames, onPlay, onStop, onEdit, onExport, onDelete }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -81,6 +85,13 @@ const SceneCard: React.FC<{
           <Tag color={scene.loop_mode === 'loop' ? 'green' : 'orange'}>
             {scene.loop_mode === 'loop' ? 'Loop' : 'Once'}
           </Tag>
+          {deviceNames.length > 0 ? (
+            deviceNames.map((name, i) => (
+              <Tag key={i} icon={<ApiOutlined />} color="purple">{name}</Tag>
+            ))
+          ) : (
+            <Tag color="default">No device</Tag>
+          )}
         </Space>
       </div>
       <div style={{ marginTop: 12 }}>
@@ -109,13 +120,16 @@ const Scenes: React.FC = () => {
   const navigate = useNavigate();
   const [scenes, setScenes] = useState<SceneData[]>([]);
   const [playbacks, setPlaybacks] = useState<Record<string, { is_playing: boolean }>>({});
+  const [devices, setDevices] = useState<DeviceData[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const [sc, pb] = await Promise.all([getScenes(), getPlaybackStatus()]);
+      const [sc, pb, devs] = await Promise.all([getScenes(), getPlaybackStatus(), getDevices()]);
       setScenes(sc);
       setPlaybacks(pb);
+      setDevices(devs);
+      setDevices(devs);
     } catch {
       message.error('Failed to load scenes');
     } finally {
@@ -205,19 +219,24 @@ const Scenes: React.FC = () => {
       </div>
 
       <Row gutter={[16, 16]}>
-        {scenes.map((scene) => (
-          <Col key={scene.id} xs={24} sm={12} md={8} lg={6}>
-            <SceneCard
-              scene={scene}
-              isPlaying={!!playbacks[String(scene.id)]?.is_playing}
-              onPlay={() => handlePlay(scene.id)}
-              onStop={() => handleStop(scene.id)}
-              onEdit={() => navigate(`/scenes/${scene.id}/edit`)}
-              onExport={() => handleExport(scene.id, scene.name)}
-              onDelete={() => handleDelete(scene.id)}
-            />
-          </Col>
-        ))}
+        {scenes.map((scene) => {
+          const devMap = new Map(devices.map(d => [d.id, d.name]));
+          const devNames = (scene.device_ids || []).map(id => devMap.get(id) || `Device #${id}`);
+          return (
+            <Col key={scene.id} xs={24} sm={12} md={8} lg={6}>
+              <SceneCard
+                scene={scene}
+                isPlaying={!!playbacks[String(scene.id)]?.is_playing}
+                deviceNames={devNames}
+                onPlay={() => handlePlay(scene.id)}
+                onStop={() => handleStop(scene.id)}
+                onEdit={() => navigate(`/scenes/${scene.id}/edit`)}
+                onExport={() => handleExport(scene.id, scene.name)}
+                onDelete={() => handleDelete(scene.id)}
+              />
+            </Col>
+          );
+        })}
         {scenes.length === 0 && (
           <Col span={24}>
             <Card style={{ textAlign: 'center', padding: 48 }}>

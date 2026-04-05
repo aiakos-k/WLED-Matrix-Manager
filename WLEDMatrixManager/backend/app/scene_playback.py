@@ -120,8 +120,39 @@ class ScenePlayback:
             self.thread.join(timeout=5)
         logger.info(f"Stopped playback: scene {self.scene_id}")
 
+    def _prepare_udp_devices(self):
+        """Send instant-black JSON command to UDP devices before first frame.
+
+        WLED shows its stored effect until the first UDP packet switches it
+        to realtime mode, causing a visible flash.  Sending a JSON API
+        command with transition=0 and black segment data first eliminates this.
+        """
+        from app.device_controller import DeviceController
+
+        for device in self.devices_info:
+            if device.get("communication_protocol") != "udp_dnrgb":
+                continue
+            ip = device.get("ip_address")
+            try:
+                cmd = {
+                    "on": True,
+                    "bri": 255,
+                    "transition": 0,
+                    "seg": {"i": [0, [0, 0, 0]]},
+                }
+                loop = asyncio.new_event_loop()
+                loop.run_until_complete(DeviceController.send_json_command(ip, cmd))
+                loop.close()
+                time.sleep(0.05)
+            except Exception as e:
+                logger.debug(f"Prepare UDP device {ip}: {e}")
+
     def _playback_loop(self):
         from app.device_controller import DeviceController
+
+        # Prepare UDP devices: send JSON command to instantly switch to black
+        # before first UDP frame arrives, preventing flash of stored WLED effect
+        self._prepare_udp_devices()
 
         loop_count = 0
         max_loops = 1 if self.loop_mode == "once" else float("inf")
@@ -214,9 +245,26 @@ class ScenePlayback:
 def start_scene_playback(
     scene_id: int, devices_info: list, frames: list, loop_mode: str = "once"
 ):
+    target_ips = {d.get("ip_address") for d in devices_info}
+
     with playback_lock:
+        # Stop any other scene already playing on any of these devices
+        conflicting = []
+        for sid, pb in active_playbacks.items():
+            if sid == scene_id:
+                continue
+            pb_ips = {d.get("ip_address") for d in pb.devices_info}
+            if pb_ips & target_ips:
+                conflicting.append(sid)
+        for sid in conflicting:
+            logger.info(f"Stopping scene {sid} (device conflict with scene {scene_id})")
+            active_playbacks[sid].stop()
+            del active_playbacks[sid]
+
+        # Stop existing playback of the same scene
         if scene_id in active_playbacks:
             active_playbacks[scene_id].stop()
+
         playback = ScenePlayback(scene_id, devices_info, frames, loop_mode)
         playback.start()
         active_playbacks[scene_id] = playback
@@ -232,6 +280,10 @@ def stop_scene_playback(scene_id: int):
 def get_all_playback_status() -> dict:
     with playback_lock:
         return {
-            scene_id: {"is_playing": pb.is_running, "loop_mode": pb.loop_mode}
+            scene_id: {
+                "is_playing": pb.is_running,
+                "loop_mode": pb.loop_mode,
+                "device_ips": [d.get("ip_address") for d in pb.devices_info],
+            }
             for scene_id, pb in active_playbacks.items()
         }

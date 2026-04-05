@@ -59,7 +59,9 @@ class DeviceController:
     @staticmethod
     async def turn_off(device_ip: str) -> bool:
         """Turn off a device."""
-        return await DeviceController.send_json_command(device_ip, {"on": False})
+        return await DeviceController.send_json_command(
+            device_ip, {"on": False, "transition": 0}
+        )
 
     @staticmethod
     def generate_wled_command(
@@ -121,6 +123,7 @@ class DeviceController:
         return {
             "on": on,
             "bri": brightness,
+            "transition": 0,
             "seg": {"id": 0, "i": led_data},
         }
 

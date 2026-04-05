@@ -58,9 +58,9 @@ class DeviceController:
 
     @staticmethod
     async def turn_off(device_ip: str) -> bool:
-        """Turn off a device."""
+        """Turn off a device and restore brightness."""
         return await DeviceController.send_json_command(
-            device_ip, {"on": False, "transition": 0}
+            device_ip, {"on": False, "bri": 255, "transition": 0}
         )
 
     @staticmethod

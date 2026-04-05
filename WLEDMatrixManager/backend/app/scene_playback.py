@@ -121,11 +121,16 @@ class ScenePlayback:
         logger.info(f"Stopped playback: scene {self.scene_id}")
 
     def _prepare_udp_devices(self):
-        """Send instant-black JSON command to UDP devices before first frame.
+        """Blackout UDP devices before first real frame to prevent flash.
 
-        WLED shows its stored effect until the first UDP packet switches it
-        to realtime mode, causing a visible flash.  Sending a JSON API
-        command with transition=0 and black segment data first eliminates this.
+        Problem: WLED shows its stored effect until the first UDP packet
+        switches it into realtime mode — causing a visible flash.
+
+        Solution: First set WLED brightness to 0 via JSON API (instant black,
+        transition=0), then send the first real UDP frame which activates
+        realtime mode while the display is already dark. UDP realtime pixel
+        data bypasses WLEDs bri setting, so the scene renders at full
+        brightness despite bri=0.
         """
         from app.device_controller import DeviceController
 
@@ -134,16 +139,11 @@ class ScenePlayback:
                 continue
             ip = device.get("ip_address")
             try:
-                cmd = {
-                    "on": True,
-                    "bri": 255,
-                    "transition": 0,
-                    "seg": {"i": [0, [0, 0, 0]]},
-                }
+                # Step 1: JSON API — set brightness to 0 instantly (kills visible effect)
+                cmd = {"on": True, "bri": 0, "transition": 0}
                 loop = asyncio.new_event_loop()
                 loop.run_until_complete(DeviceController.send_json_command(ip, cmd))
                 loop.close()
-                time.sleep(0.05)
             except Exception as e:
                 logger.debug(f"Prepare UDP device {ip}: {e}")
 

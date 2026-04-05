@@ -32,7 +32,6 @@ async def init_db():
 
     # Lightweight migrations: add columns if missing
     migrations = [
-        ("devices", "base_brightness", "INTEGER DEFAULT 255"),
         ("devices", "scale_mode", "VARCHAR(20) DEFAULT 'stretch'"),
     ]
     async with engine.begin() as conn:

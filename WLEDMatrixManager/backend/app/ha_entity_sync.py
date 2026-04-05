@@ -430,12 +430,12 @@ class HAEntitySync:
             devices_info = [
                 {
                     "ip_address": d.ip_address,
+                    "ha_entity_id": getattr(d, "ha_entity_id", None),
                     "communication_protocol": d.communication_protocol,
                     "matrix_width": d.matrix_width,
                     "matrix_height": d.matrix_height,
                     "chain_count": d.chain_count,
                     "segment_id": d.segment_id,
-                    "base_brightness": getattr(d, "base_brightness", 255) or 255,
                     "scale_mode": getattr(d, "scale_mode", "stretch") or "stretch",
                 }
                 for d in scene.devices

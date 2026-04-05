@@ -57,7 +57,6 @@ export interface DeviceData {
   communication_protocol: string;
   chain_count: number;
   segment_id: number;
-  base_brightness: number;
   scale_mode: string;
   is_active: boolean;
   is_healthy?: boolean;

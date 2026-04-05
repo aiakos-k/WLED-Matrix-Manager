@@ -417,12 +417,12 @@ async def play_scene(
     devices_info = [
         {
             "ip_address": d.ip_address,
+            "ha_entity_id": getattr(d, "ha_entity_id", None),
             "communication_protocol": d.communication_protocol,
             "matrix_width": d.matrix_width,
             "matrix_height": d.matrix_height,
             "chain_count": d.chain_count,
             "segment_id": d.segment_id,
-            "base_brightness": getattr(d, "base_brightness", 255) or 255,
             "scale_mode": getattr(d, "scale_mode", "stretch") or "stretch",
         }
         for d in devices
@@ -486,8 +486,6 @@ async def test_frame(data: TestFrameRequest, db: AsyncSession = Depends(get_sess
 
     results = []
     for dev in devices:
-        base_bri = getattr(dev, "base_brightness", 255) or 255
-        effective_bri = int(data.brightness * base_bri / 255)
         scale_mode = getattr(dev, "scale_mode", "stretch") or "stretch"
         scaled = upscale_pixel_data(
             data.pixel_data, dev.matrix_width, dev.matrix_height, mode=scale_mode
@@ -497,7 +495,7 @@ async def test_frame(data: TestFrameRequest, db: AsyncSession = Depends(get_sess
             ok = DeviceController.send_udp_dnrgb(
                 dev.ip_address,
                 scaled,
-                brightness=effective_bri,
+                brightness=data.brightness,
                 color_r=data.color_r,
                 color_g=data.color_g,
                 color_b=data.color_b,
@@ -505,7 +503,7 @@ async def test_frame(data: TestFrameRequest, db: AsyncSession = Depends(get_sess
         else:
             cmd = DeviceController.generate_wled_command(
                 scaled,
-                brightness=effective_bri,
+                brightness=data.brightness,
                 color_r=data.color_r,
                 color_g=data.color_g,
                 color_b=data.color_b,

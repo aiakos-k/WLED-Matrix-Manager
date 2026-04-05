@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Button, Card, Col, Divider, Form, Input, InputNumber, message, Modal,
-  Row, Select, Slider, Space, Table, Tag, Popconfirm, Spin, Alert, Typography,
+  Row, Select, Space, Table, Tag, Popconfirm, Spin, Alert, Typography,
 } from 'antd';
 import {
   PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined,
@@ -94,6 +94,9 @@ const Devices: React.FC = () => {
     }
   }, [haOptions.length]);
 
+  // Track whether the current form entry is linked to HA
+  const [haLinked, setHaLinked] = useState(false);
+
   const onHAEntitySelect = (entityId: string) => {
     const device = haOptions.find((d) => d.entity_id === entityId);
     if (device) {
@@ -101,11 +104,13 @@ const Devices: React.FC = () => {
       if (device.name) updates.name = device.name;
       if (device.ip_address) updates.ip_address = device.ip_address;
       form.setFieldsValue(updates);
+      setHaLinked(true);
     }
   };
 
   const onHAEntityClear = () => {
     form.setFieldsValue({ ha_entity_id: undefined });
+    setHaLinked(false);
   };
 
   // ─── CRUD ─────────────────────────────────────────────
@@ -132,6 +137,7 @@ const Devices: React.FC = () => {
   const handleEdit = (device: DeviceData) => {
     setEditDevice(device);
     form.setFieldsValue(device);
+    setHaLinked(!!device.ha_entity_id);
     setModalOpen(true);
   };
 
@@ -175,13 +181,11 @@ const Devices: React.FC = () => {
       communication_protocol: 'udp_dnrgb',
       chain_count: 1,
       segment_id: 0,
-      base_brightness: haDevice.attributes?.brightness != null
-        ? Math.round(Number(haDevice.attributes.brightness) * 255 / 100)
-        : 255,
       scale_mode: 'stretch',
     });
     setDiscoveryOpen(false);
     setEditDevice(null);
+    setHaLinked(true);
     setModalOpen(true);
   };
 
@@ -252,8 +256,9 @@ const Devices: React.FC = () => {
             form.setFieldsValue({
               matrix_width: 16, matrix_height: 16,
               communication_protocol: 'udp_dnrgb', chain_count: 1, segment_id: 0,
-              base_brightness: 255, scale_mode: 'stretch',
+              scale_mode: 'stretch',
             });
+            setHaLinked(false);
             setModalOpen(true);
           }}>
             Add Device
@@ -268,7 +273,7 @@ const Devices: React.FC = () => {
         open={modalOpen}
         title={editDevice ? 'Edit Device' : 'Add Device'}
         onOk={handleSave}
-        onCancel={() => { setModalOpen(false); setEditDevice(null); form.resetFields(); }}
+        onCancel={() => { setModalOpen(false); setEditDevice(null); setHaLinked(false); form.resetFields(); }}
         okText="Save"
         width={520}
       >
@@ -305,15 +310,15 @@ const Devices: React.FC = () => {
           <Divider style={{ margin: '8px 0 16px' }} />
 
           <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-            <Input placeholder="Living Room Matrix" />
+            <Input placeholder="Living Room Matrix" disabled={haLinked} />
           </Form.Item>
           <Form.Item
             name="ip_address"
             label="IP Address"
             rules={[{ required: true, message: 'IP address is required for device communication' }]}
-            extra={<Text type="secondary">Required — used for UDP/HTTP communication with WLED</Text>}
+            extra={haLinked ? <Text type="secondary">Managed by Home Assistant</Text> : <Text type="secondary">Required — used for UDP/HTTP communication with WLED</Text>}
           >
-            <Input placeholder="192.168.1.100" />
+            <Input placeholder="192.168.1.100" disabled={haLinked} />
           </Form.Item>
           <Row gutter={16}>
             <Col span={12}>
@@ -345,11 +350,6 @@ const Devices: React.FC = () => {
           <Form.Item name="scale_mode" label="Scale Mode"
             extra="How to map scene pixels when scene and device sizes differ">
             <Select options={SCALE_MODES} />
-          </Form.Item>
-          <Form.Item name="base_brightness" label={
-            <span>Base Brightness ({form.getFieldValue('base_brightness') ?? 255})</span>
-          } extra="Device-level brightness applied to all scenes">
-            <Slider min={0} max={255} />
           </Form.Item>
         </Form>
       </Modal>

@@ -145,8 +145,6 @@ class ScenePlayback:
                         dw = device.get("matrix_width", 16)
                         dh = device.get("matrix_height", 16)
                         scale_mode = device.get("scale_mode", "stretch")
-                        base_bri = device.get("base_brightness", 255)
-                        effective_bri = int(brightness * base_bri / 255)
 
                         upscaled = upscale_pixel_data(
                             pixel_data, dw, dh, mode=scale_mode
@@ -160,7 +158,7 @@ class ScenePlayback:
                                 DeviceController.send_udp_dnrgb(
                                     ip,
                                     pd,
-                                    brightness=effective_bri,
+                                    brightness=brightness,
                                     frame_duration=duration,
                                     color_r=color_r,
                                     color_g=color_g,
@@ -169,7 +167,7 @@ class ScenePlayback:
                             else:
                                 cmd = DeviceController.generate_wled_command(
                                     upscaled,
-                                    brightness=effective_bri,
+                                    brightness=brightness,
                                     color_r=color_r,
                                     color_g=color_g,
                                     color_b=color_b,

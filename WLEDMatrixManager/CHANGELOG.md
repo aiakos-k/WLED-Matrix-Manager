@@ -12,10 +12,8 @@
 - Solid-Black Pre-Entry zur Flash-Vermeidung bei UDP
 - Lizenz geändert zu EUPL-1.2
 
-## 1.1.0
+## 0.8.0
 
 - Initial architecture: FastAPI + React + Ingress
 
-## 1.0.0
 
-- Initial release

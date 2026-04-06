@@ -124,9 +124,9 @@ class ScenePlayback:
         from app.device_controller import DeviceController
 
         # Flash-free start: Set effect to Solid Black before first UDP frame.
-        # When realtimeLock() triggers and the effect loop renders one last
-        # frame, that frame is solid black → no visible flash.
-        # transition:0 ensures instant switch, no crossfade.
+        # ONLY change the effect — do NOT set on/bri, because WLED processes
+        # on+bri before seg in deserializeState(), which could briefly render
+        # the old effect at new brightness. Just changing the effect is safe.
         for device in self.devices_info:
             if device.get("communication_protocol") != "udp_dnrgb":
                 continue
@@ -137,8 +137,6 @@ class ScenePlayback:
                     DeviceController.send_json_command(
                         ip,
                         {
-                            "on": True,
-                            "bri": 255,
                             "transition": 0,
                             "seg": {"fx": 0, "col": [[0, 0, 0]]},
                         },
@@ -147,7 +145,10 @@ class ScenePlayback:
                 loop.close()
             except Exception as e:
                 logger.debug(f"Solid black for {ip}: {e}")
-        time.sleep(0.05)
+        # Wait for WLED to render Solid Black on physical LEDs.
+        # WS2812B: ~30µs/LED, 4096 LEDs = ~123ms per show().
+        # Need at least 2 full renders to be safe.
+        time.sleep(0.30)
 
         loop_count = 0
         max_loops = 1 if self.loop_mode == "once" else float("inf")

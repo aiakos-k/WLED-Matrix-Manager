@@ -120,17 +120,21 @@ class ScenePlayback:
             self.thread.join(timeout=5)
         logger.info(f"Stopped playback: scene {self.scene_id}")
 
-    def _prepare_udp_devices(self):
-        """Blackout UDP devices before first real frame to prevent flash.
+    def _enter_realtime_via_json(self):
+        """Enter WLED realtime mode via JSON API before first UDP packet.
 
-        Problem: WLED shows its stored effect until the first UDP packet
-        switches it into realtime mode — causing a visible flash.
+        Sends {on:true, bri:255, transition:0, live:true} as a single atomic
+        JSON request. WLED processes properties in order within one request:
+        1. on:true  → turns strip on (no show() yet)
+        2. bri:255  → sets strip brightness to 255
+        3. live:true → realtimeLock(REALTIME_MODE_GENERIC) → fill BLACK + show()
 
-        Solution: First set WLED brightness to 0 via JSON API (instant black,
-        transition=0), then send the first real UDP frame which activates
-        realtime mode while the display is already dark. UDP realtime pixel
-        data bypasses WLEDs bri setting, so the scene renders at full
-        brightness despite bri=0.
+        This ensures the strip brightness is 255 when entering realtime mode.
+        Without bri:255, a previously-off device would enter realtime with
+        strip brightness=0 and all subsequent UDP pixel data stays invisible.
+
+        When the first UDP packet then arrives, realtimeMode is already active,
+        so the flash-causing entry path in realtimeLock() is skipped entirely.
         """
         from app.device_controller import DeviceController
 
@@ -139,20 +143,23 @@ class ScenePlayback:
                 continue
             ip = device.get("ip_address")
             try:
-                # Step 1: JSON API — set brightness to 0 instantly (kills visible effect)
-                cmd = {"on": True, "bri": 0, "transition": 0}
                 loop = asyncio.new_event_loop()
-                loop.run_until_complete(DeviceController.send_json_command(ip, cmd))
+                loop.run_until_complete(
+                    DeviceController.send_json_command(
+                        ip, {"on": True, "bri": 255, "transition": 0, "live": True}
+                    )
+                )
                 loop.close()
             except Exception as e:
-                logger.debug(f"Prepare UDP device {ip}: {e}")
+                logger.debug(f"Enter realtime via JSON {ip}: {e}")
+        # Brief pause so WLED processes the command before UDP arrives
+        time.sleep(0.05)
 
     def _playback_loop(self):
         from app.device_controller import DeviceController
 
-        # Prepare UDP devices: send JSON command to instantly switch to black
-        # before first UDP frame arrives, preventing flash of stored WLED effect
-        self._prepare_udp_devices()
+        # Enter realtime mode via JSON API first to prevent flash
+        self._enter_realtime_via_json()
 
         loop_count = 0
         max_loops = 1 if self.loop_mode == "once" else float("inf")
@@ -203,7 +210,6 @@ class ScenePlayback:
                                     color_g=color_g,
                                     color_b=color_b,
                                 )
-                                # Run async in a new event loop for the thread
                                 loop = asyncio.new_event_loop()
                                 loop.run_until_complete(
                                     DeviceController.send_json_command(ip, cmd)
@@ -218,11 +224,15 @@ class ScenePlayback:
             logger.error(f"Playback error scene {self.scene_id}: {e}")
         finally:
             self.is_running = False
-            # Turn off devices
+            # Exit realtime mode and turn off devices
             for device in self.devices_info:
                 try:
                     ip = device.get("ip_address")
                     loop = asyncio.new_event_loop()
+                    # Send live:false to cleanly exit realtime mode, then turn off
+                    loop.run_until_complete(
+                        DeviceController.send_json_command(ip, {"live": False})
+                    )
                     loop.run_until_complete(DeviceController.turn_off(ip))
                     loop.close()
                 except Exception:

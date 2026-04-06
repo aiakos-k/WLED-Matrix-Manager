@@ -123,21 +123,31 @@ class ScenePlayback:
     def _playback_loop(self):
         from app.device_controller import DeviceController
 
-        # Send a black UDP frame first so realtimeLock() transitions
-        # with black pixels — no visible flash from the running effect.
-        # No JSON API needed — pure UDP approach.
+        # Flash-free start: Set effect to Solid Black before first UDP frame.
+        # When realtimeLock() triggers and the effect loop renders one last
+        # frame, that frame is solid black → no visible flash.
+        # transition:0 ensures instant switch, no crossfade.
         for device in self.devices_info:
             if device.get("communication_protocol") != "udp_dnrgb":
                 continue
             ip = device.get("ip_address")
-            dw = device.get("matrix_width", 16)
-            dh = device.get("matrix_height", 16)
             try:
-                black_data = {"pixels": [], "width": dw, "height": dh}
-                DeviceController.send_udp_dnrgb(ip, black_data, brightness=0)
+                loop = asyncio.new_event_loop()
+                loop.run_until_complete(
+                    DeviceController.send_json_command(
+                        ip,
+                        {
+                            "on": True,
+                            "bri": 255,
+                            "transition": 0,
+                            "seg": {"fx": 0, "col": [[0, 0, 0]]},
+                        },
+                    )
+                )
+                loop.close()
             except Exception as e:
-                logger.debug(f"Black pre-frame to {ip}: {e}")
-        time.sleep(0.02)
+                logger.debug(f"Solid black for {ip}: {e}")
+        time.sleep(0.05)
 
         loop_count = 0
         max_loops = 1 if self.loop_mode == "once" else float("inf")
@@ -202,7 +212,9 @@ class ScenePlayback:
             logger.error(f"Playback error scene {self.scene_id}: {e}")
         finally:
             self.is_running = False
-            # Turn off devices
+            # Turn off devices — no UDP cancel needed, realtime timeout
+            # expires naturally. With device off (bri=0), exitRealtime()
+            # shows nothing when it eventually runs.
             for device in self.devices_info:
                 try:
                     ip = device.get("ip_address")

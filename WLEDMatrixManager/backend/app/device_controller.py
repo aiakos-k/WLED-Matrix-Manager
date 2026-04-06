@@ -62,6 +62,21 @@ class DeviceController:
         return await DeviceController.send_json_command(device_ip, {"on": False})
 
     @staticmethod
+    def send_udp_cancel(device_ip: str) -> bool:
+        """Send UDP packet with timeout=0 to cancel realtime mode immediately."""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(1)
+            try:
+                sock.sendto(bytes([4, 0, 0, 0]), (device_ip, DeviceController.UDP_PORT))
+            finally:
+                sock.close()
+            return True
+        except Exception as e:
+            logger.error(f"Failed UDP cancel to {device_ip}: {e}")
+            return False
+
+    @staticmethod
     def generate_wled_command(
         pixel_data: Dict,
         brightness: int = 128,

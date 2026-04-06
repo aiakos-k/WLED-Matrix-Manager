@@ -229,14 +229,14 @@ In WLED unter Settings → Sync:
 | `send_json_command()` | HTTP POST auf `/json/state` via aiohttp |
 | `generate_wled_command()` | Baut JSON mit `seg.i` aus Pixel-Daten (Range-Compression) |
 | `send_udp_dnrgb()` | Sendet DNRGB-Pakete mit Chunking (458 LEDs/Paket) |
-| `turn_off()` | `{"on": false, "bri": 255, "transition": 0}` — Brightness für nächstes Mal wiederherstellen |
+| `turn_off()` | `{"on": false}` — Schaltet Device aus |
 | `check_health()` | GET auf `/json/info` |
 
 ### scene_playback.py
 
 | Feature | Beschreibung |
 |---------|-------------|
-| `_enter_realtime_black()` | Sendet `{"live":true}` via JSON API um sauber in Realtime zu wechseln |
+| Realtime Pre-Entry | Sendet `{"on":true, "bri":255, "live":true, "transition":0}` als atomaren JSON-Request vor dem ersten UDP-Frame. Triggert REALTIME_MODE_GENERIC → fill(BLACK) + show() → sauberer Übergang ohne Flash. |
 | `_playback_loop()` | Iteriert Frames und sendet per UDP DNRGB oder JSON API |
 | Upscaling | `upscale_pixel_data()` skaliert Szenen-Auflösung auf Device-Auflösung |
 | Device-Exclusivity | Nur eine Szene pro Device-IP gleichzeitig |

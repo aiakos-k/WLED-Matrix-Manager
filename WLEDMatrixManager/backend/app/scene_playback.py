@@ -123,18 +123,22 @@ class ScenePlayback:
     def _enter_realtime_via_json(self):
         """Enter WLED realtime mode via JSON API before first UDP packet.
 
-        Sends {on:true, bri:255, transition:0, live:true} as a single atomic
-        JSON request. WLED processes properties in order within one request:
-        1. on:true  → turns strip on (no show() yet)
-        2. bri:255  → sets strip brightness to 255
-        3. live:true → realtimeLock(REALTIME_MODE_GENERIC) → fill BLACK + show()
+        Two-step sequence to avoid both flash AND black screen:
 
-        This ensures the strip brightness is 255 when entering realtime mode.
-        Without bri:255, a previously-off device would enter realtime with
-        strip brightness=0 and all subsequent UDP pixel data stays invisible.
+        Step 1: {"live":true}
+          → realtimeLock(REALTIME_MODE_GENERIC) → fill(BLACK) + show()
+          → Cleanly enters realtime. No effect renders. Screen is black.
+          → But strip brightness is briLast (=0 if device was off).
 
-        When the first UDP packet then arrives, realtimeMode is already active,
-        so the flash-causing entry path in realtimeLock() is skipped entirely.
+        Step 2: {"on":true, "bri":255, "transition":0}
+          → Sets strip brightness to 255. Since realtimeMode is active,
+            the effect loop is suppressed (strip.service() skipped).
+            No effect frame renders. Screen stays black but brightness
+            is now 255, so the next UDP pixel data will be visible.
+
+        This must be TWO separate requests because in a single request
+        WLED processes on+bri (calls stateUpdated → renders effect)
+        BEFORE processing live:true. Splitting avoids the flash.
         """
         from app.device_controller import DeviceController
 
@@ -144,15 +148,20 @@ class ScenePlayback:
             ip = device.get("ip_address")
             try:
                 loop = asyncio.new_event_loop()
+                # Step 1: Enter realtime — blanks LEDs, no effect rendered
+                loop.run_until_complete(
+                    DeviceController.send_json_command(ip, {"live": True})
+                )
+                # Step 2: Set brightness while in realtime — no effect rendered
                 loop.run_until_complete(
                     DeviceController.send_json_command(
-                        ip, {"on": True, "bri": 255, "transition": 0, "live": True}
+                        ip, {"on": True, "bri": 255, "transition": 0}
                     )
                 )
                 loop.close()
             except Exception as e:
                 logger.debug(f"Enter realtime via JSON {ip}: {e}")
-        # Brief pause so WLED processes the command before UDP arrives
+        # Brief pause so WLED processes both commands before UDP arrives
         time.sleep(0.05)
 
     def _playback_loop(self):
@@ -224,17 +233,30 @@ class ScenePlayback:
             logger.error(f"Playback error scene {self.scene_id}: {e}")
         finally:
             self.is_running = False
-            # Exit realtime mode and turn off devices
+            # Turn off devices: send black UDP frame, exit realtime, then off
             for device in self.devices_info:
                 try:
                     ip = device.get("ip_address")
-                    loop = asyncio.new_event_loop()
-                    # Send live:false to cleanly exit realtime mode, then turn off
-                    loop.run_until_complete(
-                        DeviceController.send_json_command(ip, {"live": False})
-                    )
-                    loop.run_until_complete(DeviceController.turn_off(ip))
-                    loop.close()
+                    protocol = device.get("communication_protocol", "udp_dnrgb")
+
+                    if protocol == "udp_dnrgb":
+                        # Send a black frame via UDP so the last image disappears
+                        dw = device.get("matrix_width", 16)
+                        dh = device.get("matrix_height", 16)
+                        black_data = {"pixels": [], "width": dw, "height": dh}
+                        DeviceController.send_udp_dnrgb(ip, black_data, brightness=0)
+                        time.sleep(0.05)
+                        # Exit realtime mode, then turn off
+                        loop = asyncio.new_event_loop()
+                        loop.run_until_complete(
+                            DeviceController.send_json_command(ip, {"live": False})
+                        )
+                        loop.run_until_complete(DeviceController.turn_off(ip))
+                        loop.close()
+                    else:
+                        loop = asyncio.new_event_loop()
+                        loop.run_until_complete(DeviceController.turn_off(ip))
+                        loop.close()
                 except Exception:
                     pass
             # Update HA entity state to "off"

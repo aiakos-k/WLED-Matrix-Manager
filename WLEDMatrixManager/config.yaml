@@ -3,7 +3,7 @@ name: WLED Matrix Manager
 version: "0.9.0"
 slug: wled_matrix_manager
 description: Create and manage pixel-art scenes for WLED LED matrices
-url: "https://github.com/home-assistant/addons-example/tree/main/WLEDMatrixManager"
+url: "https://github.com/aiakos-k/WLEDMatrixManager/tree/main/WLEDMatrixManager"
 arch:
   - aarch64
   - amd64

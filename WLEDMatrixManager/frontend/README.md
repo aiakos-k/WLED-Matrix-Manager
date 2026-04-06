@@ -1,15 +1,6 @@
-# Home Assistant Add-on Frontend
+# WLED Matrix Manager — Frontend
 
-React TypeScript Frontend für das Home Assistant Add-on.
-
-## Features
-
-- 🎨 Modernes UI mit React
-- 🔌 WebSocket Echtzeit-Updates
-- 📱 Responsive Design
-- ⚡ Vite für schnelle Entwicklung
-- 🎯 TypeScript für Type-Safety
-- 🧠 Zustand State Management
+React TypeScript Frontend für den WLED Matrix Manager.
 
 ## Entwicklung
 
@@ -18,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Frontend läuft auf: http://localhost:3000
+Frontend läuft auf http://localhost:3000 (Development) bzw. wird im Produktions-Build über FastAPI ausgeliefert.
 
 ## Build
 
@@ -26,10 +17,17 @@ Frontend läuft auf: http://localhost:3000
 npm run build
 ```
 
-Die Build-Ausgabe wird in `dist/` erstellt.
+Die Build-Ausgabe in `dist/` wird vom Backend als Static Files serviert.
 
-## Environment Variables
+**Wichtig:** `base: './'` in `vite.config.ts` sorgt für relative Asset-Pfade, die über Home Assistant Ingress funktionieren.
 
-- `NODE_ENV`: 'development' oder 'production'
+## Technologien
 
-Bei production werden API-Calls automatically zum Backend proxied.
+- **React 18** + **TypeScript**
+- **Vite** — Build-Tool
+- **Ant Design** — UI-Komponenten
+- **React Router** — SPA-Navigation
+
+## Lizenz
+
+EUPL-1.2 — Siehe [LICENSE](../../LICENSE)

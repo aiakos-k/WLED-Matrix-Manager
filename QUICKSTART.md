@@ -1,6 +1,6 @@
-# 🚀 Quickstart Guide - Home Assistant Add-on
+# Quickstart Guide — WLED Matrix Manager
 
-Schnelle Anleitung um mit dem modernen Add-on Setup zu starten.
+Schnelle Anleitung um mit dem WLED Matrix Manager Setup zu starten.
 
 ## ⚡ 5-Minuten Setup (DevContainer)
 
@@ -14,8 +14,8 @@ Schnelle Anleitung um mit dem modernen Add-on Setup zu starten.
 
 ```bash
 # 1. Repository klonen
-git clone https://github.com/home-assistant/addons-example.git
-cd ha-addons-example
+git clone <repository-url>
+cd WLEDMatrixManager
 
 # 2. In VS Code öffnen
 code .
@@ -37,7 +37,7 @@ supervisor_run
 **Fertig!** 🎉
 
 - **Home Assistant**: http://localhost:7123
-- **Add-on Dashboard**: In der HA-Seitenleiste → "Example Dashboard"
+- **Add-on Dashboard**: In der HA-Seitenleiste → "WLED Matrix Manager"
 - Backend API (direkt): http://localhost:8000
 - Swagger Docs (direkt): http://localhost:8000/docs
 

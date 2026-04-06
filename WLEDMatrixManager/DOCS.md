@@ -1,350 +1,281 @@
-# Home Assistant Add-on Dokumentation
+# WLED Matrix Manager — Dokumentation
 
 ## Inhaltsverzeichnis
 
 1. [Installation](#installation)
-2. [Konfiguration](#konfiguration)
-3. [API Dokumentation](#api-dokumentation)
-4. [WebSocket Protocol](#websocket-protocol)
-5. [Entwicklung](#entwicklung)
-6. [Fehlerbehebung](#fehlerbehebung)
+2. [Erste Schritte](#erste-schritte)
+3. [Geräte verwalten](#geräte-verwalten)
+4. [Szenen erstellen & abspielen](#szenen-erstellen--abspielen)
+5. [Home Assistant Integration](#home-assistant-integration)
+6. [API-Referenz](#api-referenz)
+7. [WebSocket](#websocket)
+8. [Konfiguration](#konfiguration)
+9. [Fehlerbehebung](#fehlerbehebung)
+
+---
 
 ## Installation
 
-### Via Home Assistant
+### Via Home Assistant Add-on Store
 
 1. Gehe zu **Settings → Add-ons → Add-on Store**
-2. Klicke auf die drei Punkte und wähle **Repositories**
-3. Füge die Repository-URL hinzu
-4. Das Add-on sollte jetzt in der Liste erscheinen
-5. Klicke darauf und wähle **Install**
-6. Nach Installation klicke **Start**
+2. Klicke auf ⋮ → **Repositories** und füge die Repository-URL hinzu
+3. **WLED Matrix Manager** aus der Liste installieren
+4. Add-on starten — es erscheint in der **Seitenleiste**
 
-### Lokal aus Quelle
+### Voraussetzungen
 
-```bash
-# Repository klonen
-git clone <repository-url>
-cd ha-addons-example
+- Home Assistant 2023.8+
+- Mindestens ein WLED-Gerät im Netzwerk
+- WLED-Geräte müssen per HTTP und/oder UDP erreichbar sein
 
-# In Home Assistant DevContainer
-ha addons rebuild --force local_example
-ha addons start local_example
+---
+
+## Erste Schritte
+
+1. **Add-on starten** und in der Seitenleiste öffnen
+2. **WLED-Gerät hinzufügen** (manuell per IP oder Auto-Discovery aus HA)
+3. **Neue Szene erstellen** mit Matrix-Dimensionen (z.B. 16×16)
+4. **Pixel zeichnen** im Scene Editor
+5. **Abspielen** auf dem WLED-Gerät
+
+---
+
+## Geräte verwalten
+
+### Gerät hinzufügen
+
+Über die Geräte-Seite kannst du WLED-Geräte registrieren:
+
+- **Name** — Anzeigename
+- **IP-Adresse** — Netzwerkadresse des WLED-Geräts
+- **Matrix-Größe** — Breite × Höhe (z.B. 16×16)
+- **Kommunikationsprotokoll** — `udp_dnrgb` (Standard, für Animationen) oder `json_api`
+- **Segment-ID** — WLED-Segment (Standard: 0)
+- **Scale Mode** — Skalierung bei unterschiedlicher Auflösung (`stretch`, `tile`, `center`, `none`)
+
+### Auto-Discovery
+
+Unter `/api/ha/discover` können WLED-Geräte automatisch aus Home Assistant erkannt werden. Voraussetzung: Die WLED-Integration ist in HA konfiguriert.
+
+### Health-Check
+
+Per `/api/devices/{id}/health` wird geprüft, ob das WLED-Gerät unter der gespeicherten IP erreichbar ist (GET auf `/json/info`).
+
+---
+
+## Szenen erstellen & abspielen
+
+### Szene erstellen
+
+Eine Szene besteht aus:
+
+- **Name & Beschreibung**
+- **Matrix-Dimensionen** (Breite × Höhe)
+- **Frames** — Jeder Frame enthält:
+  - **Pixel-Daten** — JSON-Objekt mit `"x,y": [R, G, B]` Einträgen
+  - **Dauer** — Anzeigedauer in Millisekunden
+  - **Helligkeit** — 0–255
+  - **Hintergrundfarbe** — RGB-Werte für unbesetzte Pixel
+- **Loop-Modus** — `once`, `loop` oder `bounce`
+
+### Szene abspielen
+
+Szenen können über die UI oder per API (`POST /api/scenes/{id}/play`) auf zugewiesene Geräte abgespielt werden.
+
+**Playback-Verhalten:**
+- Bei **UDP DNRGB**: Vor dem ersten Frame wird ein Solid-Black-Effekt an WLED gesendet, um Start-Flash zu vermeiden (300ms Wartezeit)
+- Bei **JSON API**: Frames werden als `/json/state`-Commands mit `seg.i` gesendet
+- **Upscaling**: Szenen-Auflösung wird automatisch auf die Geräte-Auflösung skaliert
+- **Device-Exklusivität**: Pro Gerät kann nur eine Szene gleichzeitig laufen
+
+### Import/Export
+
+- **Export**: `GET /api/scenes/{id}/export` — Binärdatei (`.ledm`-Format)
+- **Import**: `POST /api/scenes/import` — `.ledm`-Datei hochladen
+- **Bild-Import**: `POST /api/image/convert` — Bild in Pixel-Daten umwandeln
+
+---
+
+## Home Assistant Integration
+
+### Custom Integration
+
+Das Add-on beinhaltet eine Custom Component (`wled_matrix_manager`), die automatisch als HA-Integration verfügbar wird.
+
+### Szenen als HA Entities
+
+Jede Szene wird als **Switch-Entity** in Home Assistant registriert:
+- `switch.wled_matrix_<scene_name>` — Ein/Aus schaltet Playback
+- Entity-Attribute zeigen Frame-Anzahl, Matrix-Dimensionen, Loop-Modus etc.
+
+### Automatisierungen
+
+Szenen können in HA-Automatisierungen genutzt werden:
+
+```yaml
+automation:
+  - trigger:
+      - platform: time
+        at: "20:00"
+    action:
+      - service: switch.turn_on
+        entity_id: switch.wled_matrix_abendstimmung
 ```
+
+---
+
+## API-Referenz
+
+Basis-URL: relativ zum Ingress-Pfad oder `http://<host>:8000`
+
+### Status & Health
+
+| Endpoint | Methode | Beschreibung |
+|----------|---------|-------------|
+| `/health` | GET | Health-Check (`ha_connected`-Status) |
+| `/api/status` | GET | Add-on Version & Status |
+| `/api/stats` | GET | Statistiken (Szenen, Geräte, aktive Playbacks) |
+
+### Geräte
+
+| Endpoint | Methode | Beschreibung |
+|----------|---------|-------------|
+| `/api/devices` | GET | Alle aktiven Geräte auflisten |
+| `/api/devices` | POST | Neues Gerät anlegen |
+| `/api/devices/{id}` | PUT | Gerät aktualisieren |
+| `/api/devices/{id}` | DELETE | Gerät deaktivieren (soft-delete) |
+| `/api/devices/{id}/health` | GET | WLED Health-Check |
+| `/api/devices/test-frame` | POST | Einzelnen Frame direkt an Geräte senden |
+| `/api/ha/discover` | GET | WLED-Geräte aus HA entdecken |
+| `/api/ha/debug` | GET | HA-Verbindungsdiagnose |
+
+### Szenen
+
+| Endpoint | Methode | Beschreibung |
+|----------|---------|-------------|
+| `/api/scenes` | GET | Alle aktiven Szenen (inkl. Frames & Devices) |
+| `/api/scenes` | POST | Neue Szene erstellen |
+| `/api/scenes/{id}` | GET | Einzelne Szene lesen |
+| `/api/scenes/{id}` | PUT | Szene aktualisieren |
+| `/api/scenes/{id}` | DELETE | Szene deaktivieren (soft-delete) |
+
+### Playback
+
+| Endpoint | Methode | Beschreibung |
+|----------|---------|-------------|
+| `/api/scenes/{id}/play` | POST | Szene abspielen |
+| `/api/scenes/{id}/stop` | POST | Playback stoppen |
+| `/api/playback/status` | GET | Status aller laufenden Playbacks |
+
+### Import/Export
+
+| Endpoint | Methode | Beschreibung |
+|----------|---------|-------------|
+| `/api/scenes/{id}/export` | GET | Szene als `.ledm` Binärdatei |
+| `/api/scenes/import` | POST | `.ledm`-Datei importieren |
+| `/api/image/convert` | POST | Bild in Pixel-Daten konvertieren |
+
+---
+
+## WebSocket
+
+Endpoint: `/ws`
+
+### Nachrichten vom Client
+
+**Preview-Frame senden** (wird an alle anderen Clients weitergeleitet):
+```json
+{"action": "preview_frame", "data": { ... }}
+```
+
+**Playback-Status abfragen:**
+```json
+{"action": "playback_status"}
+```
+
+**HA-Aktionen** (an den HA WebSocket Client):
+```json
+{"action": "get_entities"}
+{"action": "call_service", "domain": "light", "service": "turn_on", "data": {"entity_id": "light.wled"}}
+```
+
+### Nachrichten vom Server
+
+```json
+{"type": "preview_frame", "data": { ... }}
+{"type": "playback_status", "data": { ... }}
+{"type": "ack", "action": "preview_frame"}
+```
+
+---
 
 ## Konfiguration
 
-### config.yaml
+### Add-on Optionen (config.yaml)
 
-```yaml
-name: Example add-on
-slug: example
-description: Modernes Home Assistant Add-on
-version: "1.2.0"
-arch:
-  - aarch64
-  - amd64
+| Option | Beschreibung | Standard |
+|--------|-------------|----------|
+| `log_level` | Log-Level: `debug`, `info`, `warning`, `error` | `info` |
 
-# Ingress UI Settings
-ingress: true
-ingress_port: 3000
-ingress_entry_point: /dashboard
-panel_icon: mdi:application
-panel_title: Example Dashboard
+### Benötigte Berechtigungen
 
-# Exposed Ports (optional)
-ports:
-  8000/tcp: 8000
+- **homeassistant_api** — WebSocket-Kommunikation mit HA Core
+- **hassio_api (admin)** — Supervisor-Zugriff
+- **Netzwerk (Port 8000)** — Frontend & API
+- **share:rw, addon_config:rw** — Datenpersistenz
 
-# Optionen für Users
-options:
-  log_level: info
+### WLED-Gerät Einstellungen
 
-schema:
-  log_level: "list(debug|info|warning|error)?"
-```
+Relevante WLED-Settings unter Settings → Sync:
 
-### Environment Variable
+| Setting | Bedeutung |
+|---------|----------|
+| Force Max Brightness | Erzwingt Brightness 255 im Realtime-Mode |
+| Realtime Timeout | Standard-Timeout für Realtime (empfohlen: 5s) |
+| Use Main Segment Only | Nur Hauptsegment für Realtime nutzen |
 
-Das Add-on setzt automatisch:
-- `SUPERVISOR_TOKEN` - Authentifizierung zu Home Assistant
-- `HOST` - Bind Address (0.0.0.0)
-- `PORT` - Bind Port (8000)
-
-## API Dokumentation
-
-### Health Check
-
-```http
-GET /health HTTP/1.1
-```
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "ha_connected": true
-}
-```
-
-### Get Status
-
-```http
-GET /api/status HTTP/1.1
-```
-
-**Response:**
-```json
-{
-  "status": "running",
-  "version": "1.2.0",
-  "message": "Home Assistant Add-on is running"
-}
-```
-
-### Get Entities
-
-```http
-GET /api/entities HTTP/1.1
-```
-
-**Response:**
-```json
-[
-  {
-    "entity_id": "light.living_room",
-    "state": "on",
-    "attributes": {
-      "brightness": 255,
-      "color_temp": 366
-    }
-  }
-]
-```
-
-### Call Service
-
-```http
-POST /api/service/light/turn_on HTTP/1.1
-Content-Type: application/json
-
-{
-  "entity_id": "light.living_room",
-  "brightness": 200
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "domain": "light",
-  "service": "turn_on",
-  "data": {
-    "entity_id": "light.living_room",
-    "brightness": 200
-  }
-}
-```
-
-## WebSocket Protocol
-
-### Connection
-
-```javascript
-const ws = new WebSocket('ws://localhost:8000/ws');
-
-ws.onopen = () => {
-  console.log('Connected');
-};
-
-ws.onmessage = (event) => {
-  const message = JSON.parse(event.data);
-  console.log('Received:', message);
-};
-```
-
-### Message Format
-
-#### Request - Get Entities
-
-```json
-{
-  "action": "get_entities"
-}
-```
-
-#### Response
-
-```json
-{
-  "success": true,
-  "entities": [
-    {
-      "entity_id": "light.living_room",
-      "state": "on",
-      "attributes": {}
-    }
-  ]
-}
-```
-
-#### Request - Call Service
-
-```json
-{
-  "action": "call_service",
-  "domain": "light",
-  "service": "turn_off",
-  "data": {
-    "entity_id": "light.living_room"
-  }
-}
-```
-
-#### Response
-
-```json
-{
-  "success": true
-}
-```
-
-### Real-time Updates
-
-Das Add-on sendet automatisch Updates wenn sich Entities ändern:
-
-```json
-{
-  "type": "entity_update",
-  "entity": {
-    "entity_id": "sensor.temperature",
-    "state": "22.5",
-    "attributes": {
-      "unit_of_measurement": "°C"
-    }
-  }
-}
-```
-
-## Entwicklung
-
-### Setup Development Environment
-
-```bash
-# Mit VS Code DevContainer
-1. Öffne Workspace in VS Code
-2. Remote Containers Extension installieren
-3. "Dev Container: Reopen in Container" ausführen
-```
-
-### Backend Entwicklung
-
-```bash
-# Dependencies installieren
-pip install -r example/backend/requirements.txt
-
-# Development Server starten
-cd example/backend
-python main.py
-
-# Mit reload (Auto-restart bei Änderungen)
-python -m uvicorn main:app --reload
-```
-
-### Frontend Entwicklung
-
-```bash
-# Dependencies installieren
-cd example/frontend
-npm install
-
-# Development Server starten
-npm run dev
-
-# Build
-npm run build
-
-# Type-Check
-npx tsc --noEmit
-```
-
-### Testing
-
-```bash
-# Backend Tests (TODO)
-pytest
-
-# Frontend Tests (TODO)
-npm test
-```
+---
 
 ## Fehlerbehebung
 
 ### Add-on startet nicht
 
-1. **Logs prüfen:**
-   ```bash
-   docker logs addon_local_example
-   ```
+```bash
+docker logs addon_local_wled_matrix_manager
+```
 
-2. **Häufige Fehler:**
-   - Python dependencies fehlen
-   - Frontend nicht gebaut
-   - Port schon in Verwendung
+Häufige Ursachen:
+- Port 8000 bereits belegt
+- Python-Dependencies fehlerhaft → Add-on neu bauen
 
-### WebSocket Verbindung fehlgeschlagen
+### Frontend zeigt 404
 
-1. **DevTools öffnen** (F12)
-2. **Network → WS** Tab prüfen
-3. **Console** auf Fehler prüfen
-4. **Backend läuft?** - http://localhost:8000/health
+- Prüfe ob `frontend/dist/index.html` existiert (im Docker-Image)
+- Vite muss mit `base: './'` gebaut werden (siehe TEMPLATE_GUIDE.md)
 
-### Frontend zeigt nicht an
+### WLED-Gerät nicht erreichbar
 
-1. **Frontend ist gebaut?** - `npm run build`
-2. **Index.html existiert?** - `frontend/dist/index.html`
-3. **Statische Dateien werden zurückgegeben?** - Dev Tools prüfen
+1. IP-Adresse korrekt? → `curl http://<wled-ip>/json/info`
+2. Gerät im gleichen Netzwerk wie HA?
+3. Firewall-Regeln prüfen (UDP Port 21324 für DNRGB)
 
-### To Home Assistant Connectivity
+### Flash beim Playback-Start
 
-1. **SUPERVISOR_TOKEN ist gesetzt?**
-   ```bash
-   echo $SUPERVISOR_TOKEN
-   ```
+Vor dem ersten UDP-Frame wird automatisch ein Solid-Black-Effekt gesetzt (300ms Wartezeit). Falls dennoch ein Flash sichtbar ist:
+- Prüfe ob „Force Max Brightness" in WLED deaktiviert ist
+- Erhöhe die Pre-Delay-Zeit
 
-2. **WebSocket URL erreichbar?**
-   ```bash
-   curl -i ws://supervisor/core/websocket
-   ```
+Details: [WLED_PROTOCOLS.md](./backend/docs/WLED_PROTOCOLS.md) — Abschnitt „Realtime-Mode Lifecycle"
 
-3. **In Docker? (nicht im DevContainer)**
-   - Use `supervisor` hostname
-   - NOT localhost!
+### Add-on nicht in Seitenleiste
 
-## Performance Optimization
+`ingress_panel: true` muss gesetzt sein. Im DevContainer:
+```bash
+./dev.sh start:addon
+```
 
-### Backend
-- Verwende `async/await` konsequent
-- Connection Pooling für Database
-- Caching von oft abgerufenen Daten
+### WebSocket-Verbindung fehlgeschlagen
 
-### Frontend
-- Code Splitting mit dinamischen Imports
-- Image Optimierung
-- Lazy Loading von Komponenten
-
-## Security Best Practices
-
-1. **Input Validation** - Nutze Pydantic Models
-2. **HTTPS nur in Production** - Reverse Proxy
-3. **CORS konfigurieren** - Nur vertraute Origins
-4. **Rate Limiting** - Protege API vor Abuse
-5. **Logging** - Sensitive Data nicht loggen
-
-## Weitere Ressourcen
-
-- [Home Assistant Developers](https://developers.home-assistant.io/docs/add-ons/)
-- [WebSocket API Docs](https://developers.home-assistant.io/docs/api/websocket/)
-- [FastAPI Tutorial](https://fastapi.tiangolo.com/tutorial/)
-- [React Hooks](https://react.dev/reference/react)
+- Im DevContainer: WebSocket läuft auf `supervisor` Hostname, nicht `localhost`
+- Browser DevTools → Network → WS Tab auf Fehler prüfen

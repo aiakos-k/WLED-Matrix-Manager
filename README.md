@@ -1,279 +1,132 @@
-# Home Assistant Add-on Repository - Modern Architecture
+# WLED Matrix Manager — Home Assistant Add-on
 
-Ein modernes Blueprint-Repository für **Home Assistant Add-on Entwicklung** mit Best Practices.
-
-Dieses Repository zeigt die moderne, empfohlene Architektur für HA-Add-ons:
-- **Backend**: FastAPI + WebSocket Client zu Home Assistant
-- **Frontend**: React + TypeScript + Zustand State Management
-- **Integration**: Ingress UI + Multi-Stage Docker Build
-
-[![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fhome-assistant%2Faddons-example)
-
-## 📚 Dokumentation
-
-- [Home Assistant Add-on Developer Docs](https://developers.home-assistant.io/docs/add-ons)
-- [WebSocket API Reference](https://developers.home-assistant.io/docs/api/websocket/)
-
-## 🏗️ Add-ons in diesem Repository
-
-### [Example Add-on](./example)
+Erstelle und verwalte Pixel-Art-Szenen für WLED LED-Matrizen direkt aus Home Assistant heraus.
 
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]
 
-Modernes Home Assistant Add-on mit **FastAPI Backend**, **React Frontend** und **WebSocket Integration**.
+[![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fhome-assistant%2Faddons-example)
 
-**Features:**
-- ✅ FastAPI REST API + WebSocket
-- ✅ React 18 Dashboard
-- ✅ TypeScript für Type-Safety
-- ✅ Ingress UI Integration
-- ✅ Multi-Stage Docker Build
-- ✅ VS Code DevContainer
-- ✅ Async Architecture
+## Was ist WLED Matrix Manager?
 
-**Neue Benutzer?** → Siehe [QUICKSTART.md](./QUICKSTART.md)
-**Technische Details?** → Siehe [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md)
+WLED Matrix Manager ist ein Home Assistant Add-on, mit dem du:
 
-## 🚀 Schnelleinstieg
+- **Pixel-Art-Szenen** erstellen und auf WLED LED-Matrizen abspielen kannst
+- **Geräte verwalten** — WLED-Geräte hinzufügen, konfigurieren und den Health-Status prüfen
+- **Animationen abspielen** — Frame-basierte Szenen mit einstellbarer Geschwindigkeit, Helligkeit und Loop-Modi
+- **Live-Vorschau** per WebSocket direkt im Browser sehen kannst
+- **Home Assistant Integration** — Szenen werden als HA-Entities registriert und sind per Automatisierung steuerbar
+- **Import/Export** — Szenen als Binärdatei oder Bild importieren/exportieren
 
-### Mit VS Code DevContainer
-
-```bash
-# 1. Repository klonen
-git clone <this-repository>
-cd ha-addons-example
-
-# 2. In VS Code öffnen
-code .
-
-# 3. Remote Container Extension öffnen
-# Command Palette: "Dev Container: Reopen in Container"
-
-# 4. Home Assistant starten (falls nicht automatisch gestartet)
-ha supervisor start
-
-# 5. Add-on bauen und starten
-./dev.sh start:addon
-# Oder manuell:
-# ha apps rebuild --force local_example
-# ha apps start local_example
-```
-
-### Lokale Entwicklung ohne DevContainer
-
-```bash
-# Backend
-cd example/backend
-pip install -r requirements.txt
-python main.py
-
-# Frontend (in anderem Terminal)
-cd example/frontend
-npm install
-npm run dev
-```
-
-Backend: http://localhost:8000
-Frontend: http://localhost:3000
-
-> **Im DevContainer** öffne http://localhost:7123 → Das Add-on erscheint in der **Seitenleiste**.
-
-## 📁 Projektstruktur
+## Architektur
 
 ```
-ha-addons-example/
-├── .devcontainer.json          # VS Code DevContainer Config
-├── .github/
-│   └── workflows/              # GitHub Actions (CI/CD)
-├── example/                    # Example Add-on
-│   ├── backend/                # FastAPI Backend
-│   │   ├── main.py
-│   │   ├── requirements.txt
-│   │   └── app/
-│   │       ├── router.py
-│   │       ├── models.py
-│   │       └── ha_client.py
-│   ├── frontend/               # React Frontend
-│   │   ├── package.json
-│   │   ├── tsconfig.json
-│   │   ├── vite.config.ts
-│   │   └── src/
-│   │       ├── api/
-│   │       ├── store/
-│   │       ├── hooks/
-│   │       └── components/
-│   ├── rootfs/                 # Runtime Files
-│   │   └── etc/services.d/
-│   ├── Dockerfile              # Multi-Stage Build
-│   ├── config.yaml             # Add-on Config
-│   ├── build.yaml              # Build Config
-│   ├── CHANGELOG.md
-│   ├── DOCS.md
-│   └── README_NEW.md
-├── LICENSE
-└── repository.yaml             # Repository Config
+Home Assistant Core
+    │ WebSocket API
+    ▼
+FastAPI Backend (:8000)
+├── REST API (/api/...)      — Szenen, Geräte, Playback
+├── WebSocket (/ws)          — Live-Preview & Status
+├── WLED-Kommunikation       — JSON API + UDP DNRGB
+└── SQLite Datenbank         — Szenen & Geräte-Speicher
+    │
+    ▼
+React Frontend (Ingress UI)
+├── Scene Editor             — Pixel-Art Editor mit Frame-Support
+├── Device Management        — WLED-Geräte verwalten
+└── Playback Control         — Szenen starten/stoppen
 ```
 
-## 🔧 Verwendete Technologien
+### Kommunikationsprotokolle
+
+| Protokoll | Einsatz | Max LEDs |
+|-----------|---------|----------|
+| **JSON API** (`/json/state`) | Einzelframes, Konfiguration | unbegrenzt |
+| **UDP DNRGB** (Port 21324) | Echtzeit-Streaming, Animationen | 489/Paket (chunked) |
+
+Details: [WLED_PROTOCOLS.md](./WLEDMatrixManager/backend/docs/WLED_PROTOCOLS.md)
+
+## Installation
+
+### Via Home Assistant Add-on Store
+
+1. **Settings → Add-ons → Add-on Store** → ⋮ → **Repositories**
+2. Repository-URL hinzufügen
+3. **WLED Matrix Manager** installieren und starten
+4. Das Add-on erscheint in der **Seitenleiste**
+
+### Entwickler-Setup
+
+Siehe [QUICKSTART.md](./QUICKSTART.md) für das DevContainer-Setup.
+
+## Konfiguration
+
+| Option | Beschreibung | Standard |
+|--------|-------------|----------|
+| `log_level` | Log-Level (`debug`, `info`, `warning`, `error`) | `info` |
+
+Das Add-on benötigt:
+- **Homeassistant API** — für WebSocket-Kommunikation mit HA Core
+- **Hassio API (admin)** — für Supervisor-Zugriff
+- **Netzwerkzugriff** — UDP/HTTP-Kommunikation mit WLED-Geräten
+
+## API-Übersicht
+
+| Endpoint | Methode | Beschreibung |
+|----------|---------|-------------|
+| `/api/status` | GET | Add-on Status |
+| `/api/devices` | GET/POST | Geräte auflisten/anlegen |
+| `/api/devices/{id}` | PUT/DELETE | Gerät bearbeiten/löschen |
+| `/api/devices/{id}/health` | GET | WLED-Gerät Health-Check |
+| `/api/ha/discover` | GET | WLED-Geräte aus HA entdecken |
+| `/api/scenes` | GET/POST | Szenen auflisten/anlegen |
+| `/api/scenes/{id}` | GET/PUT/DELETE | Szene lesen/bearbeiten/löschen |
+| `/api/scenes/{id}/play` | POST | Szene abspielen |
+| `/api/scenes/{id}/stop` | POST | Playback stoppen |
+| `/api/scenes/{id}/export` | GET | Szene als Binärdatei exportieren |
+| `/api/scenes/import` | POST | Szene importieren |
+| `/api/devices/test-frame` | POST | Einzelnen Frame an Geräte senden |
+| `/health` | GET | Health-Check |
+| `/ws` | WebSocket | Live-Preview & Playback-Status |
+
+Swagger-Docs: `http://<host>:8000/docs`
+
+## Technologien
 
 ### Backend
-- **FastAPI** - Modernes Python Web Framework
-- **Python 3.11+** - Aktuelle Python Version
-- **aiohttp** - Async HTTP Client
-- **Pydantic** - Data Validation
-- **Uvicorn** - ASGI Server
+- **Python 3.11+** / **FastAPI** / **Uvicorn**
+- **SQLAlchemy** (async) + **SQLite**
+- **aiohttp** — WLED HTTP & HA WebSocket
+- **Pydantic** — Datenvalidierung
+- **Pillow / NumPy** — Bildverarbeitung
 
 ### Frontend
-- **React 18** - UI Framework
-- **TypeScript** - Type-safe JavaScript
-- **Vite** - Moderne Build Tool
-- **Zustand** - State Management
-- **Axios** - HTTP Client
+- **React 18** / **TypeScript** / **Vite**
+- **Ant Design** — UI-Komponenten
+- **React Router** — SPA-Navigation
 
-### Infrastructure
-- **Docker** - Containerization
-- **Alpine Linux 3.15** - Leichte Base Image
-- **Home Assistant** - Smart Home Platform
-- **GitHub Actions** - CI/CD Pipeline
+### Infrastruktur
+- **Docker** Multi-Stage Build
+- **s6-overlay** — Prozess-Management
+- **Home Assistant Ingress** — nahtlose UI-Integration
 
-## 📖 Konfiguration anpassen
+## Dokumentation
 
-### Repository Einstellungen
+- [QUICKSTART.md](./QUICKSTART.md) — DevContainer-Setup & erste Schritte
+- [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md) — Ingress-Routing & Build-Architektur
+- [WLED_PROTOCOLS.md](./WLEDMatrixManager/backend/docs/WLED_PROTOCOLS.md) — WLED-Protokollreferenz (JSON API, UDP DNRGB, Realtime-Mode)
+- [DOCS.md](./WLEDMatrixManager/DOCS.md) — Detaillierte Add-on Dokumentation
 
-1. Fork oder klone dieses Repository
-2. Passe `repository.yaml` an deine Daten an:
+## Lizenz
 
-```yaml
-name: Mein Add-on Repository
-url: https://github.com/username/my-addon-repo
-maintainer: Dein Name
-```
+Dieses Projekt ist unter der **European Union Public Licence v. 1.2 (EUPL-1.2)** lizenziert.
 
-3. Rename `example` directory zu deinem Add-on Namen
-4. Update `example/config.yaml`:
+Siehe [LICENSE](./LICENSE) für den vollständigen Lizenztext.
 
-```yaml
-slug: my_addon              # Wichtig: muss Directory Namen matchen
-name: Mein Custom Add-on
-image: ghcr.io/username/{arch}-addon-my_addon
-```
-
-5. Passe GitHub Actions workflow an (`.github/workflows/builder.yaml`)
-
-6. Pushe zur deinem Repository
-7. Aktiviere GitHu Actions unter Settings → Actions → General
-
-## 🔌 API Integration
-
-### Home Assistant WebSocket
-
-Der HAClient stellt eine persistente Verbindung her:
-
-```python
-# backend/app/ha_client.py
-client = HAClient()
-await client.connect()  # Verbindung zu HA herstellen
-```
-
-### Service Calls
-
-```javascript
-// Frontend
-haClient.callService('light', 'turn_on', {
-  entity_id: 'light.living_room'
-})
-```
-
-### Real-time Updates
-
-WebSocket Updates werden automatisch zum Frontend gestreamt:
-
-```json
-{
-  "type": "entity_update",
-  "entity": {
-    "entity_id": "sensor.temp",
-    "state": "22.5"
-  }
-}
-```
-
-## 🧪 Testen
-
-### Lokal testen
-
-```bash
-# Build Docker Image
-docker build -t test_addon ./example
-
-# Run in Docker
-docker run --network="host" test_addon
-```
-
-### Im Home Assistant DevContainer
-
-```bash
-# Rebuild & Start Add-on (empfohlen)
-./dev.sh start:addon
-
-# Oder manuell:
-ha apps rebuild --force local_example
-ha apps start local_example
-
-# View Logs
-./dev.sh logs
-```
-
-## 📝 Weitere Schritte nach Setup
-
-- [ ] Repository forken/klonen
-- [ ] `repository.yaml` anpassen
-- [ ] `example` directory umbenennen
-- [ ] `config.yaml` aktualisieren
-- [ ] GitHub Actions konfigurieren
-- [ ] GitHub Container Registry Setup
-- [ ] Dein First Add-on publishen! 🎉
-
-## 🐛 Häufige Probleme
-
-### Add-on startet nicht
-```bash
-docker logs addon_local_example
-```
-
-### Frontend wird nicht angezeigt / 404 Not Found
-```bash
-# Frontend muss mit relativen Pfaden gebaut werden (base: './' in vite.config.ts)
-cd example/frontend
-npm run build
-```
-→ Siehe [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md) für Details zum Ingress-Routing
-
-### Add-on nicht in der Seitenleiste
-```bash
-# ingress_panel muss aktiviert werden (./dev.sh start:addon macht das automatisch)
-./dev.sh start:addon
-```
-
-### WebSocket Verbindung fehlgeschlagen
-- Im DevContainer: WebSocket läuft auf `supervisor` Hostname
-- Nicht `localhost`!
-
-## 📞 Support & Community
-
-- [Home Assistant Community Forum](https://community.home-assistant.io/)
-- [Home Assistant Discord](https://discord.gg/home-assistant)
-- [Home Assistant GitHub Discussions](https://github.com/home-assistant/core/discussions)
-
-## 📄 Lizenz
-
-Apache License 2.0 - siehe [LICENSE](./LICENSE)
+EUPL-1.2 ist kompatibel mit GPL v2/v3, AGPL v3, LGPL v2.1/v3, MPL v2 und weiteren
+(siehe Anhang der Lizenz).
 
 ---
 
-**Viel Spaß bei der Add-on Entwicklung! 🏠✨**
-
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg
-[armv7-shield]: https://img.shields.io/badge/armv7-yes-green.svg

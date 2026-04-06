@@ -3,7 +3,7 @@
   "name": "WLED Matrix Manager",
   "codeowners": [],
   "config_flow": true,
-  "documentation": "https://github.com/home-assistant/addons-example",
+  "documentation": "https://github.com/home-assistant/addons-example/tree/main/WLEDMatrixManager",
   "integration_type": "service",
   "iot_class": "local_polling",
   "version": "1.2.0",

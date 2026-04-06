@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="WLED Matrix Manager",
     description="Create and play pixel-art scenes on WLED LED matrices",
-    version="1.2.0",
+    version="0.9.0",
     lifespan=lifespan,
 )
 

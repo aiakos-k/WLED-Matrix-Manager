@@ -1,6 +1,6 @@
 <!-- https://developers.home-assistant.io/docs/add-ons/presentation#keeping-a-changelog -->
 
-## 1.2.0
+## 0.9.0
 
 - WLED Matrix Manager: Pixel-Art Scene Editor & Playback
 - WLED-Geräteverwaltung mit Auto-Discovery aus Home Assistant

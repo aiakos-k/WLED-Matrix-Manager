@@ -46,7 +46,7 @@ router = APIRouter(prefix="/api", tags=["api"])
 @router.get("/status", response_model=Status)
 async def get_status():
     return Status(
-        status="running", version="1.2.0", message="WLED Matrix Manager is running"
+        status="running", version="0.9.0", message="WLED Matrix Manager is running"
     )
 
 

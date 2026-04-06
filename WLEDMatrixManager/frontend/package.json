@@ -1,7 +1,7 @@
 {
   "name": "wled-matrix-manager",
   "private": true,
-  "version": "1.2.0",
+  "version": "0.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

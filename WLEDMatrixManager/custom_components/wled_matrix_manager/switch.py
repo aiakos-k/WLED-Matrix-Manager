@@ -78,7 +78,7 @@ class WLEDSceneSwitch(CoordinatorEntity[WLEDMatrixCoordinator], SwitchEntity):
             name="WLED Matrix Manager",
             manufacturer="WLED Matrix Manager",
             model="LED Matrix Scene Controller",
-            sw_version="1.2.0",
+            sw_version="0.9.0",
         )
 
     @property

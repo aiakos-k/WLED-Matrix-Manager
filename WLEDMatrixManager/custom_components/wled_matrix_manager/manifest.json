@@ -3,7 +3,7 @@
   "name": "WLED Matrix Manager",
   "codeowners": [],
   "config_flow": true,
-  "documentation": "https://github.com/aiakos-k/WLEDMatrixManager/tree/main/WLEDMatrixManager",
+  "documentation": "https://github.com/aiakos-k/WLED-Matrix-Manager/tree/main/WLEDMatrixManager",
   "integration_type": "service",
   "iot_class": "local_polling",
   "version": "0.9.0",

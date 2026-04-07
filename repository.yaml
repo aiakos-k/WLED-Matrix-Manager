@@ -1,4 +1,4 @@
 # https://developers.home-assistant.io/docs/add-ons/repository#repository-configuration
 name: WLED Matrix Manager Add-on Repository
-url: "https://github.com/aiakos-k/WLEDMatrixManager"
+url: "https://github.com/aiakos-k/WLED-Matrix-Manager"
 maintainer: aiakos-k

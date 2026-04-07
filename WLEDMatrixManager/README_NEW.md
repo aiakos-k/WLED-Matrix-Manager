@@ -54,8 +54,6 @@ WLEDMatrixManager/
 │   │   └── utils/              binaryFormat, wledParser
 │   ├── vite.config.ts          base: './' für Ingress
 │   └── package.json
-├── custom_components/
-│   └── wled_matrix_manager/    HA Custom Integration (Switch)
 ├── rootfs/                     s6-overlay Service
 ├── Dockerfile                  Multi-Stage Build (Node → Python)
 ├── config.yaml                 Add-on Konfiguration

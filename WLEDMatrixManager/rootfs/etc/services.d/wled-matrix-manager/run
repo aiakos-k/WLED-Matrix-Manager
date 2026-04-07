@@ -19,17 +19,6 @@ export LOG_LEVEL="${log_level:=info}"
 bashio::log.info "Starting Home Assistant Add-on..."
 bashio::log.info "Log level: ${LOG_LEVEL}"
 
-## Install custom integration into Home Assistant
-if [ -d /homeassistant ]; then
-    bashio::log.info "Installing WLED Matrix Manager integration..."
-    mkdir -p /homeassistant/custom_components/wled_matrix_manager
-    cp -rf /app/custom_components/wled_matrix_manager/* \
-        /homeassistant/custom_components/wled_matrix_manager/
-    bashio::log.info "Integration installed to /homeassistant/custom_components/"
-else
-    bashio::log.warning "HA config dir not found — integration NOT installed"
-fi
-
 ## Change to app directory
 cd /app/backend
 

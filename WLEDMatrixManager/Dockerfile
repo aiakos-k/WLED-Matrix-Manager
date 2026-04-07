@@ -43,9 +43,6 @@ RUN mkdir -p /data
 # Copy built frontend from stage 1
 COPY --from=frontend-build /app/frontend/dist ../frontend/dist
 
-# Copy custom integration for HA
-COPY custom_components /app/custom_components
-
 # Copy root filesystem
 COPY rootfs /
 

@@ -1,20 +1,10 @@
 """
 Home Assistant Entity Sync — manages scene switch entities in HA.
 
-Two mechanisms work together:
-
-1. REST entities + WS call_service listener (immediate, zero setup):
-   - POST /api/states/switch.wled_scene_* creates visible entities
-   - WebSocket subscribes to call_service events for toggle handling
-   - On toggle: starts/stops playback + updates entity state
-
-2. Custom integration auto-setup (device grouping, automatic):
-   - Addon copies custom_components/ to HA config dir on start
-   - After HA restart: integration domain is loaded by HA Core
-   - Addon periodically tries to auto-create config entry via config flow
-   - Integration provides proper Device grouping + native switch control
-   - REST entities are cleaned up once integration takes over
-   - If integration not loaded yet, a notification asks the user to restart HA
+Uses REST entities + WS call_service listener (immediate, zero setup):
+- POST /api/states/switch.wled_scene_* creates visible entities
+- WebSocket subscribes to call_service events for toggle handling
+- On toggle: starts/stops playback + updates entity state
 """
 
 import asyncio
@@ -52,11 +42,9 @@ class HAEntitySync:
         self._token: str = ""
         self._running = False
         self._listen_task: Optional[asyncio.Task] = None
-        self._auto_setup_task: Optional[asyncio.Task] = None
         self._ws = None
         self._ws_session: Optional[aiohttp.ClientSession] = None
         self._scene_meta: Dict[int, dict] = {}  # scene_id -> meta
-        self._integration_active = False
 
     def _entity_id(self, scene_id: int, name: str) -> str:
         return f"switch.wled_scene_{scene_id}_{_sanitize_name(name)}"
@@ -72,30 +60,14 @@ class HAEntitySync:
             logger.warning("HAEntitySync: No Core API — entities will not be synced")
             return
 
-        # Check if the custom integration is already handling entities
-        self._integration_active = await self._check_integration_active()
-
-        if self._integration_active:
-            logger.info(
-                "HAEntitySync: Custom integration active — cleaning up REST entities"
-            )
-            await self._cleanup_rest_entities()
-            return
-
-        # No integration yet: use REST entities + WS listener
         self._running = True
         self._listen_task = asyncio.create_task(self._listen_for_service_calls())
         logger.info("HAEntitySync: REST entities + WS call_service listener active")
-
-        # Try auto-configuring the custom integration (delayed — server not up yet)
-        self._auto_setup_task = asyncio.create_task(self._delayed_auto_setup())
 
     async def stop(self):
         self._running = False
         if self._listen_task:
             self._listen_task.cancel()
-        if self._auto_setup_task:
-            self._auto_setup_task.cancel()
         if self._ws:
             try:
                 await self._ws.close()
@@ -110,9 +82,6 @@ class HAEntitySync:
     # ─── Public API (called from router.py / scene_playback.py) ──
 
     async def sync_all_scenes(self):
-        if self._integration_active:
-            return
-
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
 
@@ -152,9 +121,6 @@ class HAEntitySync:
         is_playing: bool = False,
         **kwargs,
     ):
-        if self._integration_active:
-            return
-
         eid = self._entity_id(scene_id, name)
         self._scene_meta[scene_id] = {
             "name": name,
@@ -180,9 +146,6 @@ class HAEntitySync:
         await self._set_state(eid, state, attributes)
 
     async def update_scene_playing(self, scene_id: int, is_playing: bool):
-        if self._integration_active:
-            return
-
         meta = self._scene_meta.get(scene_id)
         if not meta:
             return
@@ -201,8 +164,6 @@ class HAEntitySync:
         await self._set_state(eid, state, attrs)
 
     async def remove_scene(self, scene_id: int):
-        if self._integration_active:
-            return
         meta = self._scene_meta.pop(scene_id, None)
         if meta:
             await self._delete_state(meta["entity_id"])
@@ -464,240 +425,3 @@ class HAEntitySync:
         stop_scene_playback(scene_id)
         await self.update_scene_playing(scene_id, False)
         logger.info(f"HAEntitySync: Stopped scene {scene_id} via HA")
-
-    # ─── Custom integration auto-setup ────────────────────────
-
-    async def _check_integration_active(self) -> bool:
-        """Check if the custom integration created entities (states API)."""
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"{self._core_api_url}/states",
-                    headers={"Authorization": f"Bearer {self._token}"},
-                    timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
-                    if resp.status == 200:
-                        states = await resp.json()
-                        return any(
-                            s.get("entity_id", "").startswith(
-                                "switch.wled_matrix_manager_"
-                            )
-                            for s in states
-                        )
-        except Exception as e:
-            logger.debug(f"Integration check: {e}")
-        return False
-
-    async def _delayed_auto_setup(self):
-        """Wait for FastAPI, then periodically try to auto-configure the integration."""
-        try:
-            await asyncio.sleep(15)  # Wait for uvicorn to accept connections
-            notified = False
-
-            for _ in range(360):  # Try for up to ~3 hours
-                if not self._running or self._integration_active:
-                    return
-
-                # Check if integration entities appeared (user may have set it up)
-                if await self._check_integration_active():
-                    logger.info(
-                        "HAEntitySync: Custom integration detected — "
-                        "switching to native mode"
-                    )
-                    self._integration_active = True
-                    await self._cleanup_rest_entities()
-                    return
-
-                # Try auto-setup (config flow)
-                if await self._try_auto_setup():
-                    return
-
-                # If integration domain not loaded, notify user once
-                if not notified:
-                    notified = True
-                    await self._notify_restart_needed()
-
-                await asyncio.sleep(30)
-
-        except asyncio.CancelledError:
-            return
-        except Exception as e:
-            logger.debug(f"Integration auto-setup: {e}")
-
-    def _get_addon_ip(self) -> str:
-        """Get this addon's IP on the hassio Docker network."""
-        import socket
-
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("172.30.32.1", 80))  # hassio network gateway
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except Exception:
-            return ""
-
-    async def _notify_restart_needed(self):
-        """Create a persistent notification asking the user to restart HA."""
-        try:
-            async with aiohttp.ClientSession() as session:
-                await session.post(
-                    f"{self._core_api_url}/services/persistent_notification/create",
-                    json={
-                        "title": "WLED Matrix Manager",
-                        "message": (
-                            "Bitte starte Home Assistant einmalig neu, um die "
-                            "WLED Matrix Manager Integration zu aktivieren. "
-                            "Danach werden die Scene-Entities automatisch unter "
-                            "einem Gerät gruppiert.\n\n"
-                            "**Einstellungen → System → Neustart**"
-                        ),
-                        "notification_id": "wled_mm_restart",
-                    },
-                    headers={
-                        "Authorization": f"Bearer {self._token}",
-                        "Content-Type": "application/json",
-                    },
-                    timeout=aiohttp.ClientTimeout(total=5),
-                )
-        except Exception:
-            pass
-
-    async def _dismiss_notification(self):
-        """Remove the restart notification."""
-        try:
-            async with aiohttp.ClientSession() as session:
-                await session.post(
-                    f"{self._core_api_url}/services/persistent_notification/dismiss",
-                    json={"notification_id": "wled_mm_restart"},
-                    headers={
-                        "Authorization": f"Bearer {self._token}",
-                        "Content-Type": "application/json",
-                    },
-                    timeout=aiohttp.ClientTimeout(total=5),
-                )
-        except Exception:
-            pass
-
-    async def _try_auto_setup(self) -> bool:
-        """Try to create a config entry for the integration.
-
-        Returns True if the integration is now active (created or already exists).
-        """
-        try:
-            async with aiohttp.ClientSession() as session:
-                # Start config flow
-                async with session.post(
-                    f"{self._core_api_url}/config/config_entries/flow",
-                    json={
-                        "handler": "wled_matrix_manager",
-                        "show_advanced_options": False,
-                    },
-                    headers={
-                        "Authorization": f"Bearer {self._token}",
-                        "Content-Type": "application/json",
-                    },
-                    timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
-                    if resp.status != 200:
-                        logger.debug(
-                            f"Config flow start: {resp.status} — "
-                            "integration domain not loaded yet"
-                        )
-                        return False
-                    flow = await resp.json()
-
-                flow_id = flow.get("flow_id")
-                flow_type = flow.get("type")
-
-                if flow_type == "abort":
-                    reason = flow.get("reason", "")
-                    logger.info(
-                        f"HAEntitySync: Integration already configured ({reason})"
-                    )
-                    self._integration_active = True
-                    await self._cleanup_rest_entities()
-                    await self._dismiss_notification()
-                    return True
-
-                if not flow_id:
-                    return False
-
-                # Try hostname first (works in production), fall back to IP
-                hosts_to_try = ["addon_local_wled_matrix_manager"]
-                addon_ip = self._get_addon_ip()
-                if addon_ip:
-                    hosts_to_try.append(addon_ip)
-
-                for host in hosts_to_try:
-                    async with session.post(
-                        f"{self._core_api_url}/config/config_entries/flow/{flow_id}",
-                        json={"host": host, "port": 8000},
-                        headers={
-                            "Authorization": f"Bearer {self._token}",
-                            "Content-Type": "application/json",
-                        },
-                        timeout=aiohttp.ClientTimeout(total=15),
-                    ) as resp:
-                        if resp.status == 200:
-                            result = await resp.json()
-                            if result.get("type") in ("create_entry", "abort"):
-                                logger.info(
-                                    "HAEntitySync: Custom integration "
-                                    f"auto-configured (host={host})! "
-                                    "Device grouping active."
-                                )
-                                self._integration_active = True
-                                await self._cleanup_rest_entities()
-                                await self._dismiss_notification()
-                                return True
-                            # If cannot_connect with this host, the flow
-                            # stays open — try next host
-                            errors = result.get("errors", {})
-                            if errors.get("base") == "cannot_connect":
-                                logger.debug(
-                                    f"Config flow: cannot_connect with host={host}"
-                                )
-                                continue
-                            logger.debug(f"Auto-setup flow result: {result}")
-                        else:
-                            body = await resp.text()
-                            logger.debug(f"Auto-setup flow: {resp.status} {body[:200]}")
-                            break
-        except Exception as e:
-            logger.debug(f"Auto-setup attempt: {e}")
-        return False
-
-    async def _cleanup_rest_entities(self):
-        """Remove REST-created switch.wled_scene_* entities."""
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"{self._core_api_url}/states",
-                    headers={"Authorization": f"Bearer {self._token}"},
-                    timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
-                    if resp.status != 200:
-                        return
-                    states = await resp.json()
-
-            removed = 0
-            for state in states:
-                eid = state.get("entity_id", "")
-                if eid.startswith("switch.wled_scene_"):
-                    try:
-                        async with aiohttp.ClientSession() as session:
-                            async with session.delete(
-                                f"{self._core_api_url}/states/{eid}",
-                                headers={"Authorization": f"Bearer {self._token}"},
-                                timeout=aiohttp.ClientTimeout(total=5),
-                            ) as resp:
-                                if resp.status in (200, 204):
-                                    removed += 1
-                    except Exception:
-                        pass
-
-            if removed:
-                logger.info(f"HAEntitySync: cleaned up {removed} REST entities")
-        except Exception as e:
-            logger.debug(f"Cleanup failed: {e}")

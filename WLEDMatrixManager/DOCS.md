@@ -99,10 +99,6 @@ Szenen können über die UI oder per API (`POST /api/scenes/{id}/play`) auf zuge
 
 ## Home Assistant Integration
 
-### Custom Integration
-
-Das Add-on beinhaltet eine Custom Component (`wled_matrix_manager`), die automatisch als HA-Integration verfügbar wird.
-
 ### Szenen als HA Entities
 
 Jede Szene wird als **Switch-Entity** in Home Assistant registriert:

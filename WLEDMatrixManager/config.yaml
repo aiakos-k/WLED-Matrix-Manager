@@ -22,7 +22,6 @@ ports:
 map:
   - share:rw
   - addon_config:rw
-  - homeassistant_config:rw
 options:
   log_level: info
 schema:

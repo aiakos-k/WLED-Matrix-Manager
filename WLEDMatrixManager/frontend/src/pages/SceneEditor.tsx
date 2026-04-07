@@ -896,7 +896,7 @@ const SceneEditor: React.FC = () => {
             <Space direction="vertical" style={{ width: '100%' }} size={8}>
               <div>
                 <label>Duration (sec)</label>
-                <InputNumber min={0.1} max={60} step={0.1} value={curFrame?.duration ?? 1.0}
+                <InputNumber min={0.1} max={900} step={0.1} value={curFrame?.duration ?? 1.0}
                   onChange={(v) => updateFrameProp('duration', v)} style={{ width: '100%' }} />
               </div>
               <div>

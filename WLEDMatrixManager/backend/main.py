@@ -57,6 +57,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.middleware("http")
+async def normalize_path(request, call_next):
+    """Collapse double slashes injected by the HA ingress proxy."""
+    scope = request.scope
+    path = scope["path"]
+    while "//" in path:
+        path = path.replace("//", "/")
+    scope["path"] = path
+    return await call_next(request)
+
+
 app.include_router(router)
 
 

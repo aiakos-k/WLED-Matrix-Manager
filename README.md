@@ -18,6 +18,32 @@ WLED Matrix Manager ist ein Home Assistant Add-on, mit dem du:
 - **Home Assistant Integration** — Szenen werden als HA-Entities registriert und sind per Automatisierung steuerbar
 - **Import/Export** — Szenen als Binärdatei oder Bild importieren/exportieren
 
+## Screenshots
+
+### Dashboard
+
+![Dashboard](images/screenshot-dashboard.png)
+
+Übersicht mit Szenen-Anzahl, verbundenen Geräten und aktiven Playbacks.
+
+### Szenen-Verwaltung
+
+![Scenes](images/screenshot-scenes.png)
+
+Szenen erstellen, importieren und direkt auf WLED-Matrizen abspielen — mit Live-Vorschau.
+
+### Geräte-Verwaltung
+
+![Devices](images/screenshot-devices.png)
+
+WLED-Geräte hinzufügen, Status prüfen und Kommunikationsprotokoll wählen (JSON API oder UDP DNRGB).
+
+### Scene Editor
+
+![Scene Editor](images/screenshot-scene-editor.png)
+
+Pixel-Art-Editor mit Frame-Support, Farbwähler, Helligkeitssteuerung und Live-Vorschau.
+
 ## Architektur
 
 ```

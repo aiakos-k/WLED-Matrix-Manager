@@ -10,6 +10,8 @@ Erstelle und verwalte Pixel-Art-Szenen für WLED LED-Matrizen.
 WLED Matrix Manager ermöglicht es dir, Pixel-Art-Szenen für WLED-gesteuerte LED-Matrizen
 direkt aus Home Assistant heraus zu erstellen, zu verwalten und abzuspielen.
 
+![Scenes](../images/screenshot-scenes.png)
+
 ### Features
 
 - **Scene Editor** — Pixel-Art-Szenen mit mehreren Frames erstellen

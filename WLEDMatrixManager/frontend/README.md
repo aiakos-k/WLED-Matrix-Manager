@@ -1,15 +1,15 @@
 # WLED Matrix Manager — Frontend
 
-React TypeScript Frontend für den WLED Matrix Manager.
+React TypeScript frontend for the WLED Matrix Manager.
 
-## Entwicklung
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Frontend läuft auf http://localhost:3000 (Development) bzw. wird im Produktions-Build über FastAPI ausgeliefert.
+The frontend runs on http://localhost:3000 (development) or is served as static files by FastAPI in production builds.
 
 ## Build
 
@@ -17,17 +17,17 @@ Frontend läuft auf http://localhost:3000 (Development) bzw. wird im Produktions
 npm run build
 ```
 
-Die Build-Ausgabe in `dist/` wird vom Backend als Static Files serviert.
+The build output in `dist/` is served by the backend as static files.
 
-**Wichtig:** `base: './'` in `vite.config.ts` sorgt für relative Asset-Pfade, die über Home Assistant Ingress funktionieren.
+**Important:** `base: './'` in `vite.config.ts` ensures relative asset paths that work via Home Assistant Ingress.
 
-## Technologien
+## Technologies
 
 - **React 18** + **TypeScript**
-- **Vite** — Build-Tool
-- **Ant Design** — UI-Komponenten
-- **React Router** — SPA-Navigation
+- **Vite** — Build tool
+- **Ant Design** — UI components
+- **React Router** — SPA navigation
 
-## Lizenz
+## License
 
-EUPL-1.2 — Siehe [LICENSE](../../LICENSE)
+EUPL-1.2 — See [LICENSE](../../LICENSE)

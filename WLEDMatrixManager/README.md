@@ -1,37 +1,37 @@
 # Home Assistant Add-on: WLED Matrix Manager
 
-Erstelle und verwalte Pixel-Art-Szenen für WLED LED-Matrizen.
+Create and manage pixel-art scenes for WLED LED matrices.
 
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]
 
-## Über dieses Add-on
+## About This Add-on
 
-WLED Matrix Manager ermöglicht es dir, Pixel-Art-Szenen für WLED-gesteuerte LED-Matrizen
-direkt aus Home Assistant heraus zu erstellen, zu verwalten und abzuspielen.
+WLED Matrix Manager lets you create, manage, and play pixel-art scenes for WLED-controlled
+LED matrices directly from Home Assistant.
 
 ![Scenes](../images/screenshot-scenes.png)
 
 ### Features
 
-- **Scene Editor** — Pixel-Art-Szenen mit mehreren Frames erstellen
-- **Device Management** — WLED-Geräte hinzufügen und konfigurieren
-- **Playback** — Animationen auf WLED-Matrizen abspielen (JSON API oder UDP DNRGB)
-- **HA Integration** — Szenen als Home Assistant Entities, per Automatisierung steuerbar
-- **Auto-Discovery** — WLED-Geräte automatisch aus Home Assistant erkennen
-- **Import/Export** — Szenen als Binärdatei oder Bild importieren/exportieren
-- **Live-Vorschau** — WebSocket-basierte Echtzeit-Vorschau im Browser
+- **Scene Editor** — Create pixel-art scenes with multiple frames
+- **Device Management** — Add and configure WLED devices
+- **Playback** — Play animations on WLED matrices (JSON API or UDP DNRGB)
+- **HA Integration** — Scenes as Home Assistant entities, controllable via automations
+- **Auto-Discovery** — Automatically discover WLED devices from Home Assistant
+- **Import/Export** — Import and export scenes as binary files or images
+- **Live Preview** — WebSocket-based real-time preview in the browser
 
-### Unterstützte WLED-Protokolle
+### Supported WLED Protocols
 
-| Protokoll | Beschreibung |
-|-----------|-------------|
-| JSON API | HTTP-basiert, für Einzelframes und Konfiguration |
-| UDP DNRGB | Echtzeit-Streaming, ideal für Animationen (bis 489 LEDs/Paket) |
+| Protocol | Description |
+|----------|-------------|
+| JSON API | HTTP-based, for single frames and configuration |
+| UDP DNRGB | Real-time streaming, ideal for animations (up to 489 LEDs/packet) |
 
-## Lizenz
+## License
 
-EUPL-1.2 — Siehe [LICENSE](https://eupl.eu/1.2/de/)
+EUPL-1.2 — See [LICENSE](https://eupl.eu/1.2/en/)
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg

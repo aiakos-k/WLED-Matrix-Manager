@@ -1,22 +1,22 @@
-# WLED Protokoll-Referenz
+# WLED Protocol Reference
 
-Dieses Dokument beschreibt die zwei Kommunikationsprotokolle, die wir mit WLED-Geräten verwenden,
-basierend auf dem [WLED Firmware-Quellcode](https://github.com/wled/WLED/blob/main/wled00/udp.cpp)
-und der offiziellen Dokumentation.
+This document describes the two communication protocols we use with WLED devices,
+based on the [WLED firmware source code](https://github.com/wled/WLED/blob/main/wled00/udp.cpp)
+and the official documentation.
 
 ---
 
 ## 1. JSON API (HTTP)
 
 **Endpoint:** `POST http://<IP>/json/state`
-**Doku:** https://kno.wled.ge/interfaces/json-api/
+**Docs:** https://kno.wled.ge/interfaces/json-api/
 
-### Wie wir es nutzen
+### How We Use It
 
-Wir senden JSON-Objekte um LEDs per Per-Segment Individual LED Control (`seg.i`) zu steuern.
-Das ist die "sichere" Methode — kein Flash, supports transition, volle Kontrolle.
+We send JSON objects to control LEDs via Per-Segment Individual LED Control (`seg.i`).
+This is the "safe" method — no flash, supports transitions, full control.
 
-### Unser Command-Format
+### Our Command Format
 
 ```json
 {
@@ -30,81 +30,81 @@ Das ist die "sichere" Methode — kein Flash, supports transition, volle Kontrol
 }
 ```
 
-### Wichtige State-Properties
+### Important State Properties
 
-| Property | Typ | Beschreibung |
-|----------|-----|-------------|
-| `on` | bool | An/Aus. `"t"` zum togglen |
-| `bri` | 0-255 | Master-Brightness. **Wenn `on: false`, enthält es die letzte Brightness** |
-| `transition` | 0-65535 | Crossfade-Dauer in 100ms-Einheiten. `0` = sofort |
-| `tt` | 0-65535 | Einmal-Transition nur für diesen API-Call |
-| `live` | bool | **Erzwingt Realtime-Mode und blankt LEDs.** Kein Timeout! Muss mit `{"live":false}` beendet werden |
-| `lor` | 0/1/2 | Live data override. 0=off, 1=bis live endet, 2=bis Reboot |
-| `seg.i` | array | Individuelles LED-Array. Format: `[index, [R,G,B], ...]` oder Ranges `[start, stop, [R,G,B]]` |
+| Property | Type | Description |
+|----------|------|-------------|
+| `on` | bool | On/Off. `"t"` to toggle |
+| `bri` | 0-255 | Master brightness. **When `on: false`, contains the last brightness** |
+| `transition` | 0-65535 | Crossfade duration in 100ms units. `0` = instant |
+| `tt` | 0-65535 | One-time transition only for this API call |
+| `live` | bool | **Forces realtime mode and blanks LEDs.** No timeout! Must be ended with `{"live":false}` |
+| `lor` | 0/1/2 | Live data override. 0=off, 1=until live ends, 2=until reboot |
+| `seg.i` | array | Individual LED array. Format: `[index, [R,G,B], ...]` or ranges `[start, stop, [R,G,B]]` |
 
-### Segment-LEDs (`seg.i`) Format
+### Segment LEDs (`seg.i`) Format
 
-Drei Varianten:
+Three variants:
 
 ```json
-// Einzelne LEDs
+// Individual LEDs
 {"seg":{"i":["FF0000","00FF00","0000FF"]}}
 
-// Mit explizitem Index
+// With explicit index
 {"seg":{"i":[0,"FF0000", 2,"00FF00", 4,"0000FF"]}}
 
-// Ranges (start bis stop-1)
+// Ranges (start to stop-1)
 {"seg":{"i":[0, 8, "FF0000", 10, 18, "0000FF"]}}
 ```
 
-**Hinweis:** LED-Indizes sind Segment-basiert (LED 0 = erste LED des Segments).
+**Note:** LED indices are segment-based (LED 0 = first LED of the segment).
 
-### Brightness-Interaktion
+### Brightness Interaction
 
 > "For your colors to apply correctly, make sure the desired brightness is set beforehand.
 > Turning on the LEDs from an off state and setting individual LEDs in the same JSON request will not work!"
 
-→ Deshalb setzen wir `"on": true, "bri": X` im selben Command zusammen mit `seg.i`.
+→ That's why we set `"on": true, "bri": X` in the same command along with `seg.i`.
 
 ---
 
-## 2. UDP Realtime — DNRGB Protokoll
+## 2. UDP Realtime — DNRGB Protocol
 
-**Port:** 21324 (Standard WLED UDP-Port)
-**Doku:** https://kno.wled.ge/interfaces/udp-realtime/
+**Port:** 21324 (default WLED UDP port)
+**Docs:** https://kno.wled.ge/interfaces/udp-realtime/
 
-### Protokolltypen auf Port 21324
+### Protocol Types on Port 21324
 
-| Byte 0 | Protokoll | Max LEDs |
-|--------|-----------|----------|
+| Byte 0 | Protocol | Max LEDs |
+|--------|----------|----------|
 | 0 | WLED Notifier (Sync) | - |
 | 1 | WARLS | 255 |
 | 2 | DRGB | 490 |
 | 3 | DRGBW | 367 |
-| **4** | **DNRGB** ← wir nutzen das | **489/Paket** |
+| **4** | **DNRGB** ← we use this | **489/packet** |
 | 5 | DNRGBW | - |
 
-### DNRGB Paketformat
+### DNRGB Packet Format
 
 ```
-Byte 0:    4 (Protokoll-ID für DNRGB)
-Byte 1:    Timeout in Sekunden (1-254, 255 = kein Timeout / indefinite)
-Byte 2:    Start-LED-Index High-Byte
-Byte 3:    Start-LED-Index Low-Byte
-Byte 4+:   [R, G, B, R, G, B, ...] Pixeldaten ab Start-Index
+Byte 0:    4 (protocol ID for DNRGB)
+Byte 1:    Timeout in seconds (1-254, 255 = no timeout / indefinite)
+Byte 2:    Start LED index high byte
+Byte 3:    Start LED index low byte
+Byte 4+:   [R, G, B, R, G, B, ...] pixel data from start index
 ```
 
-**Max Paketgröße:** 1472 Bytes (UDP_IN_MAXSIZE in WLED)
-→ Header: 4 Bytes + 3 Bytes/LED = max **489 LEDs pro Paket**
-→ Wir nutzen 458 LEDs/Paket (`MAX_LEDS_PER_PACKET`) als Sicherheitspuffer
+**Max packet size:** 1472 bytes (UDP_IN_MAXSIZE in WLED)
+→ Header: 4 bytes + 3 bytes/LED = max **489 LEDs per packet**
+→ We use 458 LEDs/packet (`MAX_LEDS_PER_PACKET`) as a safety buffer
 
-### Timeout-Byte (Byte 1)
+### Timeout Byte (Byte 1)
 
-- `1-254`: Sekunden bis WLED automatisch Realtime-Mode verlässt
-- `255`: Kein Timeout — bleibt in Realtime bis explizit beendet
-- `0`: **Spezialwert — beendet Realtime sofort!**
+- `1-254`: Seconds until WLED automatically exits realtime mode
+- `255`: No timeout — stays in realtime until explicitly ended
+- `0`: **Special value — exits realtime immediately!**
 
-Aus dem Quellcode:
+From the source code:
 ```cpp
 if (udpIn[1] == 0) {
     realtimeTimeout = 0;  // cancel realtime mode immediately
@@ -114,9 +114,9 @@ if (udpIn[1] == 0) {
 }
 ```
 
-### Chunked Packets für große Matrizen
+### Chunked Packets for Large Matrices
 
-DNRGB unterstützt beliebig viele LEDs durch mehrere Pakete mit verschiedenen Start-Indizes:
+DNRGB supports any number of LEDs via multiple packets with different start indices:
 
 ```
 Paket 1: [4, timeout, 0x00, 0x00, R,G,B, R,G,B, ...]  ← LEDs 0-457
@@ -124,7 +124,7 @@ Paket 2: [4, timeout, 0x01, 0xCA, R,G,B, R,G,B, ...]  ← LEDs 458-915
 ...
 ```
 
-### WLED-Verarbeitung (aus udp.cpp)
+### WLED Processing (from udp.cpp)
 
 ```cpp
 if (udpIn[0] == 4 && packetSize > 7) { // DNRGB
@@ -133,169 +133,169 @@ if (udpIn[0] == 4 && packetSize > 7) { // DNRGB
         setRealtimePixel(id, udpIn[i], udpIn[i+1], udpIn[i+2], 0);
     }
 }
-// Nach allen Protokollen:
+// After all protocols:
 if (useMainSegmentOnly) strip.trigger();
 else                    strip.show();
 ```
 
-→ Die Pixel werden **nach dem realtimeLock()** gesetzt und dann per `strip.show()` angezeigt.
+→ Pixels are set **after realtimeLock()** and then displayed via `strip.show()`.
 
 ---
 
-## 3. Realtime-Mode Lifecycle (Flash-Ursache & Lösung)
+## 3. Realtime-Mode Lifecycle (Flash Cause & Solution)
 
-### Entry: `realtimeLock()` — Ursache des Flash
+### Entry: `realtimeLock()` — Cause of the Flash
 
 ```cpp
 void realtimeLock(uint32_t timeoutMs, byte md) {
     if (!realtimeMode && !realtimeOverride) {
-        // ── Dieser Block läuft NUR beim ERSTEN Eintritt ──
+        // ── This block only runs on FIRST entry ──
         if (useMainSegmentOnly) {
             mainseg.clear();
             mainseg.freeze = true;
         } else {
-            strip.fill(BLACK);   // Alle LEDs schwarz
+            strip.fill(BLACK);   // All LEDs black
         }
         if (briT == 0) {
-            // Strip war AUS → letzte Brightness wiederherstellen
+            // Strip was OFF → restore last brightness
             strip.setBrightness(briLast, true);
         }
     }
     realtimeMode = md;
     if (arlsForceMaxBri) strip.setBrightness(255, true);
-    // show() nur für GENERIC (JSON API), NICHT für UDP!
+    // show() only for GENERIC (JSON API), NOT for UDP!
     if (briT > 0 && md == REALTIME_MODE_GENERIC) strip.show();
 }
 ```
 
-### Warum der Flash passiert
+### Why the Flash Occurs
 
-1. WLED zeigt aktuell einen Effekt (z.B. Rainbow) bei Brightness X
-2. Erstes UDP-Paket kommt → `realtimeLock()` wird aufgerufen
-3. `strip.fill(BLACK)` füllt den Buffer schwarz
-4. **ABER:** Zwischen fill(BLACK) und dem tatsächlichen setRealtimePixel() + show()
-   kann der WLED-Effekt-Loop noch einen Frame rendern → **Flash des alten Effekts**
-5. Zusätzlich: `setBrightness(briLast)` stellt Brightness wieder her, falls Strip OFF war
-6. `arlsForceMaxBri` in WLED-Settings kann Brightness auf 255 erzwingen
+1. WLED is currently displaying an effect (e.g., Rainbow) at brightness X
+2. First UDP packet arrives → `realtimeLock()` is called
+3. `strip.fill(BLACK)` fills the buffer with black
+4. **BUT:** Between fill(BLACK) and the actual setRealtimePixel() + show(),
+   the WLED effect loop can still render one frame → **flash of the old effect**
+5. Additionally: `setBrightness(briLast)` restores brightness if the strip was OFF
+6. `arlsForceMaxBri` in WLED settings can force brightness to 255
 
 ### Exit: `exitRealtime()`
 
 ```cpp
 void exitRealtime() {
-    strip.setBrightness(bri, true);  // Normale Brightness wiederherstellen
+    strip.setBrightness(bri, true);  // Restore normal brightness
     realtimeTimeout = 0;
     realtimeMode = REALTIME_MODE_INACTIVE;
-    strip.show();  // Zeigt den normalen Effekt wieder an
+    strip.show();  // Displays the normal effect again
 }
 ```
 
-→ Wird automatisch aufgerufen wenn der Timeout abläuft.
+→ Called automatically when the timeout expires.
 
-### Lösung: "Solid Black Effect" vor UDP-Start ✅
+### Solution: "Solid Black Effect" Before UDP Start ✅
 
-Nach vielen Iterationen (10+) hat sich folgende Strategie als einzig zuverlässige Lösung erwiesen:
+After many iterations (10+), the following strategy proved to be the only reliable solution:
 
-**Vor dem ersten UDP-Frame:**
+**Before the first UDP frame:**
 ```json
 {"transition": 0, "seg": {"fx": 0, "col": [[0, 0, 0]]}}
 ```
 
-Dann **300ms warten**, bevor das erste UDP-Paket gesendet wird.
+Then **wait 300ms** before sending the first UDP packet.
 
-#### Warum das funktioniert
+#### Why This Works
 
-1. Der Effekt wird auf **Solid (fx:0)** mit Farbe **Schwarz** gesetzt
-2. `transition: 0` → sofort, kein Crossfade
-3. WLED rendert innerhalb weniger Effekt-Cycles (33ms bei 30fps) schwarze Pixel
-4. 300ms Wartezeit gibt WS2812B genug Zeit für 2+ vollständige `show()`-Durchgänge
-   (4096 LEDs × 30µs/LED = ~123ms pro show)
-5. Wenn das erste UDP-Paket `realtimeLock()` auslöst und der Effekt-Loop noch einen
-   letzten Frame rendert → dieser ist **Solid Schwarz** → kein sichtbarer Flash
+1. The effect is set to **Solid (fx:0)** with color **black**
+2. `transition: 0` → instant, no crossfade
+3. WLED renders black pixels within a few effect cycles (33ms at 30fps)
+4. 300ms wait gives WS2812B enough time for 2+ full `show()` cycles
+   (4096 LEDs × 30µs/LED = ~123ms per show)
+5. When the first UDP packet triggers `realtimeLock()` and the effect loop renders
+   one last frame → it's **solid black** → no visible flash
 
-#### Was NICHT funktioniert hat (und warum)
+#### What Did NOT Work (and Why)
 
-| Versuch | Problem |
+| Attempt | Problem |
 |---------|---------|
-| `{"live": true}` vor UDP | Setzt Realtime ohne Timeout. `turn_off()` am Ende wird ignoriert (Device bleibt im Realtime). `{"live":false}` verursacht End-Flash durch `exitRealtime()`. |
-| `{"on":true, "bri":255, "live":true}` atomar | WLED verarbeitet `on`+`bri` VOR `live` in `deserializeState()` → Effekt rendert einen Frame bei voller Helligkeit → Flash sogar stärker |
-| `{"on":false}` → UDP → `{"on":true}` | UDP bei ausgeschaltetem Device triggert trotzdem `realtimeLock()` mit `setBrightness(briLast)`. Das `on:true` danach triggert `colorUpdated()` → alter Effekt flasht kurz |
-| Mehrere schwarze UDP-Pre-Frames | Flash passiert beim ERSTEN UDP-Paket in `realtimeLock()`. Weitere Frames kommen zu spät — der Effekt-Loop hat bereits gerendert |
-| `{"on":true, "bri":255, "seg":{"fx":0, "col":[[0,0,0]]}}` | `on`+`bri` werden VOR `seg` verarbeitet. Für einen Frame rendert WLED den alten Effekt bei neuer Brightness |
+| `{"live": true}` before UDP | Sets realtime without timeout. `turn_off()` at the end is ignored (device stays in realtime). `{"live":false}` causes end-flash via `exitRealtime()`. |
+| `{"on":true, "bri":255, "live":true}` atomic | WLED processes `on`+`bri` BEFORE `live` in `deserializeState()` → effect renders one frame at full brightness → flash is even stronger |
+| `{"on":false}` → UDP → `{"on":true}` | UDP on a turned-off device still triggers `realtimeLock()` with `setBrightness(briLast)`. The `on:true` afterwards triggers `colorUpdated()` → old effect flashes briefly |
+| Multiple black UDP pre-frames | Flash happens on the FIRST UDP packet in `realtimeLock()`. Additional frames come too late — the effect loop has already rendered |
+| `{"on":true, "bri":255, "seg":{"fx":0, "col":[[0,0,0]]}}` | `on`+`bri` are processed BEFORE `seg`. For one frame WLED renders the old effect at the new brightness |
 
-#### Warum NUR `seg`-Änderung funktioniert
+#### Why ONLY `seg` Changes Work
 
-WLED's `deserializeState()` verarbeitet Properties in dieser Reihenfolge:
-1. `on`, `bri` → State-Änderungen, lösen `colorUpdated()` aus → Effekt rendert
-2. `transition` → Übergangszeit
-3. `seg` → Segment-Properties (Effekt, Farbe, etc.)
+WLED's `deserializeState()` processes properties in this order:
+1. `on`, `bri` → State changes, trigger `colorUpdated()` → effect renders
+2. `transition` → Transition time
+3. `seg` → Segment properties (effect, color, etc.)
 
-Wenn man `on`/`bri` weglässt und NUR `seg` ändert, wird kein State-Change getriggert
-der den alten Effekt rendert. Der Effekt wechselt direkt auf Solid Black.
+If you omit `on`/`bri` and ONLY change `seg`, no state change is triggered
+that renders the old effect. The effect switches directly to Solid Black.
 
-### Playback-Ende: Einfaches `turn_off()` ✅
+### Playback End: Simple `turn_off()` ✅
 
 ```json
 {"on": false}
 ```
 
-Am Ende der Scene-Playback reicht ein einfaches `turn_off()`. Der UDP Realtime-Timeout
-(typisch 5 Sekunden) läuft natürlich ab. `exitRealtime()` ruft dann `setBrightness(bri)`
-und `show()` auf — aber da das Device bereits OFF ist (`bri=0`), zeigt `show()` nichts an.
+At the end of scene playback, a simple `turn_off()` is sufficient. The UDP realtime timeout
+(typically 5 seconds) expires naturally. `exitRealtime()` then calls `setBrightness(bri)`
+and `show()` — but since the device is already OFF (`bri=0`), `show()` displays nothing.
 
-**Kein `send_udp_cancel()` oder `{"live":false}` nötig** — beides löst `exitRealtime()`
-sofort aus, was den gespeicherten Effekt kurz anzeigen kann bevor `turn_off()` greift.
+**No `send_udp_cancel()` or `{"live":false}` needed** — both trigger `exitRealtime()`
+immediately, which can briefly display the stored effect before `turn_off()` takes effect.
 
-### WLED-Settings die Realtime beeinflussen
+### WLED Settings That Affect Realtime
 
-In WLED unter Settings → Sync:
+In WLED under Settings → Sync:
 
-| Setting | Bedeutung |
-|---------|----------|
-| **Force Max Brightness** (`arlsForceMaxBri`) | Erzwingt Brightness 255 im Realtime-Mode |
-| **Realtime Timeout** (`realtimeTimeoutMs`) | Standard-Timeout für Realtime (wird durch `live:true` überschrieben) |
-| **Use Main Segment Only** | Nur Hauptsegment für Realtime nutzen (freeze statt fill) |
+| Setting | Description |
+|---------|-------------|
+| **Force Max Brightness** (`arlsForceMaxBri`) | Forces brightness 255 in realtime mode |
+| **Realtime Timeout** (`realtimeTimeoutMs`) | Default timeout for realtime (overridden by `live:true`) |
+| **Use Main Segment Only** | Use only the main segment for realtime (freeze instead of fill) |
 
 ---
 
-## 4. Unsere Implementierung
+## 4. Our Implementation
 
 ### device_controller.py
 
-| Methode | Beschreibung |
-|---------|-------------|
-| `send_json_command()` | HTTP POST auf `/json/state` via aiohttp |
-| `generate_wled_command()` | Baut JSON mit `seg.i` aus Pixel-Daten (Range-Compression) |
-| `send_udp_dnrgb()` | Sendet DNRGB-Pakete mit Chunking (458 LEDs/Paket) |
-| `send_udp_cancel()` | Sendet `[4,0,0,0]` — DNRGB mit timeout=0 um Realtime sofort zu beenden |
-| `turn_off()` | `{"on": false}` — Schaltet Device aus |
-| `check_health()` | GET auf `/json/info` |
+| Method | Description |
+|--------|-------------|
+| `send_json_command()` | HTTP POST to `/json/state` via aiohttp |
+| `generate_wled_command()` | Builds JSON with `seg.i` from pixel data (range compression) |
+| `send_udp_dnrgb()` | Sends DNRGB packets with chunking (458 LEDs/packet) |
+| `send_udp_cancel()` | Sends `[4,0,0,0]` — DNRGB with timeout=0 to end realtime immediately |
+| `turn_off()` | `{"on": false}` — Turns device off |
+| `check_health()` | GET on `/json/info` |
 
 ### scene_playback.py
 
-| Feature | Beschreibung |
+| Feature | Description |
 |---------|-------------|
-| Solid-Black Pre-Entry | Sendet `{"transition":0, "seg":{"fx":0, "col":[[0,0,0]]}}` + 300ms Wartezeit vor dem ersten UDP-Frame. Eliminiert den Start-Flash. |
-| `_playback_loop()` | Iteriert Frames und sendet per UDP DNRGB oder JSON API |
-| Playback-Ende | Einfaches `turn_off()` → `{"on":false}`. Realtime-Timeout läuft natürlich ab. |
-| Upscaling | `upscale_pixel_data()` skaliert Szenen-Auflösung auf Device-Auflösung |
-| Device-Exclusivity | Nur eine Szene pro Device-IP gleichzeitig |
+| Solid-Black Pre-Entry | Sends `{"transition":0, "seg":{"fx":0, "col":[[0,0,0]]}}` + 300ms wait before the first UDP frame. Eliminates the start flash. |
+| `_playback_loop()` | Iterates frames and sends via UDP DNRGB or JSON API |
+| Playback End | Simple `turn_off()` → `{"on":false}`. Realtime timeout expires naturally. |
+| Upscaling | `upscale_pixel_data()` scales scene resolution to device resolution |
+| Device Exclusivity | Only one scene per device IP at a time |
 
-### Brightness-Kette
+### Brightness Chain
 
 ```
-Frame-Brightness (0-255)
+Frame Brightness (0-255)
     ↓
-    ├─ JSON API: "bri" Property (WLED Master-Brightness)
-    │   → WLED wendet es global auf alle seg.i Pixel an
+    ├─ JSON API: "bri" property (WLED master brightness)
+    │   → WLED applies it globally to all seg.i pixels
     │
-    └─ UDP DNRGB: Brightness per Software in Pixel eingerechnet
-        → Kein separates Brightness-Byte im DNRGB-Protokoll
+    └─ UDP DNRGB: Brightness applied in software to pixel values
+        → No separate brightness byte in the DNRGB protocol
         → Pixel = [R*factor, G*factor, B*factor]
 ```
 
 ---
 
-## 5. Referenzen
+## 5. References
 
 - **WLED Firmware Source:** https://github.com/wled/WLED/blob/main/wled00/udp.cpp
 - **UDP Realtime Doku:** https://kno.wled.ge/interfaces/udp-realtime/

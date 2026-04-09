@@ -1,16 +1,16 @@
-# WLED Matrix Manager — Dokumentation
+# WLED Matrix Manager — Documentation
 
-## Inhaltsverzeichnis
+## Table of Contents
 
 1. [Installation](#installation)
-2. [Erste Schritte](#erste-schritte)
-3. [Geräte verwalten](#geräte-verwalten)
-4. [Szenen erstellen & abspielen](#szenen-erstellen--abspielen)
+2. [First Steps](#first-steps)
+3. [Managing Devices](#managing-devices)
+4. [Creating & Playing Scenes](#creating--playing-scenes)
 5. [Home Assistant Integration](#home-assistant-integration)
-6. [API-Referenz](#api-referenz)
+6. [API Reference](#api-reference)
 7. [WebSocket](#websocket)
-8. [Konfiguration](#konfiguration)
-9. [Fehlerbehebung](#fehlerbehebung)
+8. [Configuration](#configuration)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -18,96 +18,96 @@
 
 ### Via Home Assistant Add-on Store
 
-1. Gehe zu **Settings → Add-ons → Add-on Store**
-2. Klicke auf ⋮ → **Repositories** und füge die Repository-URL hinzu
-3. **WLED Matrix Manager** aus der Liste installieren
-4. Add-on starten — es erscheint in der **Seitenleiste**
+1. Go to **Settings → Add-ons → Add-on Store**
+2. Click ⋮ → **Repositories** and add the repository URL
+3. Install **WLED Matrix Manager** from the list
+4. Start the add-on — it appears in the **sidebar**
 
-### Voraussetzungen
+### Prerequisites
 
 - Home Assistant 2023.8+
-- Mindestens ein WLED-Gerät im Netzwerk
-- WLED-Geräte müssen per HTTP und/oder UDP erreichbar sein
+- At least one WLED device on the network
+- WLED devices must be reachable via HTTP and/or UDP
 
 ---
 
-## Erste Schritte
+## First Steps
 
-1. **Add-on starten** und in der Seitenleiste öffnen
-2. **WLED-Gerät hinzufügen** (manuell per IP oder Auto-Discovery aus HA)
-3. **Neue Szene erstellen** mit Matrix-Dimensionen (z.B. 16×16)
-4. **Pixel zeichnen** im Scene Editor
-5. **Abspielen** auf dem WLED-Gerät
+1. **Start the add-on** and open it from the sidebar
+2. **Add a WLED device** (manually via IP or Auto-Discovery from HA)
+3. **Create a new scene** with matrix dimensions (e.g., 16×16)
+4. **Draw pixels** in the Scene Editor
+5. **Play** on the WLED device
 
 ---
 
-## Geräte verwalten
+## Managing Devices
 
-### Gerät hinzufügen
+### Adding a Device
 
-Über die Geräte-Seite kannst du WLED-Geräte registrieren:
+On the Devices page you can register WLED devices:
 
-- **Name** — Anzeigename
-- **IP-Adresse** — Netzwerkadresse des WLED-Geräts
-- **Matrix-Größe** — Breite × Höhe (z.B. 16×16)
-- **Kommunikationsprotokoll** — `udp_dnrgb` (Standard, für Animationen) oder `json_api`
-- **Segment-ID** — WLED-Segment (Standard: 0)
-- **Scale Mode** — Skalierung bei unterschiedlicher Auflösung (`stretch`, `tile`, `center`, `none`)
+- **Name** — Display name
+- **IP Address** — Network address of the WLED device
+- **Matrix Size** — Width × Height (e.g., 16×16)
+- **Communication Protocol** — `udp_dnrgb` (default, for animations) or `json_api`
+- **Segment ID** — WLED segment (default: 0)
+- **Scale Mode** — Scaling for different resolutions (`stretch`, `tile`, `center`, `none`)
 
 ### Auto-Discovery
 
-Unter `/api/ha/discover` können WLED-Geräte automatisch aus Home Assistant erkannt werden. Voraussetzung: Die WLED-Integration ist in HA konfiguriert.
+Via `/api/ha/discover`, WLED devices can be automatically discovered from Home Assistant. Prerequisite: The WLED integration is configured in HA.
 
-### Health-Check
+### Health Check
 
-Per `/api/devices/{id}/health` wird geprüft, ob das WLED-Gerät unter der gespeicherten IP erreichbar ist (GET auf `/json/info`).
+Via `/api/devices/{id}/health`, the add-on checks whether the WLED device is reachable at the stored IP (GET on `/json/info`).
 
 ---
 
-## Szenen erstellen & abspielen
+## Creating & Playing Scenes
 
-### Szene erstellen
+### Creating a Scene
 
-Eine Szene besteht aus:
+A scene consists of:
 
-- **Name & Beschreibung**
-- **Matrix-Dimensionen** (Breite × Höhe)
-- **Frames** — Jeder Frame enthält:
-  - **Pixel-Daten** — JSON-Objekt mit `"x,y": [R, G, B]` Einträgen
-  - **Dauer** — Anzeigedauer in Millisekunden
-  - **Helligkeit** — 0–255
-  - **Hintergrundfarbe** — RGB-Werte für unbesetzte Pixel
-- **Loop-Modus** — `once`, `loop` oder `bounce`
+- **Name & Description**
+- **Matrix Dimensions** (Width × Height)
+- **Frames** — Each frame contains:
+  - **Pixel Data** — JSON object with `"x,y": [R, G, B]` entries
+  - **Duration** — Display duration in milliseconds
+  - **Brightness** — 0–255
+  - **Background Color** — RGB values for unset pixels
+- **Loop Mode** — `once`, `loop`, or `bounce`
 
-### Szene abspielen
+### Playing a Scene
 
-Szenen können über die UI oder per API (`POST /api/scenes/{id}/play`) auf zugewiesene Geräte abgespielt werden.
+Scenes can be played on assigned devices via the UI or API (`POST /api/scenes/{id}/play`).
 
-**Playback-Verhalten:**
-- Bei **UDP DNRGB**: Vor dem ersten Frame wird ein Solid-Black-Effekt an WLED gesendet, um Start-Flash zu vermeiden (300ms Wartezeit)
-- Bei **JSON API**: Frames werden als `/json/state`-Commands mit `seg.i` gesendet
-- **Upscaling**: Szenen-Auflösung wird automatisch auf die Geräte-Auflösung skaliert
-- **Device-Exklusivität**: Pro Gerät kann nur eine Szene gleichzeitig laufen
+**Playback behavior:**
+- With **UDP DNRGB**: Before the first frame, a solid-black effect is sent to WLED to prevent the start flash (300ms wait)
+- With **JSON API**: Frames are sent as `/json/state` commands with `seg.i`
+- **Upscaling**: Scene resolution is automatically scaled to the device resolution
+- **Device exclusivity**: Only one scene can run per device at a time
 
 ### Import/Export
 
-- **Export**: `GET /api/scenes/{id}/export` — Binärdatei (`.ledm`-Format)
-- **Import**: `POST /api/scenes/import` — `.ledm`-Datei hochladen
-- **Bild-Import**: `POST /api/image/convert` — Bild in Pixel-Daten umwandeln
+- **Export**: `GET /api/scenes/{id}/export` — Binary file (`.ledm` format)
+- **Import**: `POST /api/scenes/import` — Upload `.ledm` file
+- **Image Import**: `POST /api/image/convert` — Convert image to pixel data
 
 ---
 
 ## Home Assistant Integration
 
-### Szenen als HA Entities
+### Scenes as HA Entities
 
-Jede Szene wird als **Switch-Entity** in Home Assistant registriert:
-- `switch.wled_matrix_<scene_name>` — Ein/Aus schaltet Playback
-- Entity-Attribute zeigen Frame-Anzahl, Matrix-Dimensionen, Loop-Modus etc.
+Each scene is registered as a **Switch entity** in Home Assistant:
+- `switch.wled_matrix_<scene_name>` — On/Off toggles playback
+- Entity attributes show frame count, matrix dimensions, loop mode, etc.
 
-### Automatisierungen
+### Automations
 
-Szenen können in HA-Automatisierungen genutzt werden:
+Scenes can be used in HA automations:
 
 ```yaml
 automation:
@@ -116,61 +116,61 @@ automation:
         at: "20:00"
     action:
       - service: switch.turn_on
-        entity_id: switch.wled_matrix_abendstimmung
+        entity_id: switch.wled_matrix_evening_mood
 ```
 
 ---
 
-## API-Referenz
+## API Reference
 
-Basis-URL: relativ zum Ingress-Pfad oder `http://<host>:8000`
+Base URL: relative to the Ingress path or `http://<host>:8000`
 
 ### Status & Health
 
-| Endpoint | Methode | Beschreibung |
-|----------|---------|-------------|
-| `/health` | GET | Health-Check (`ha_connected`-Status) |
-| `/api/status` | GET | Add-on Version & Status |
-| `/api/stats` | GET | Statistiken (Szenen, Geräte, aktive Playbacks) |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check (`ha_connected` status) |
+| `/api/status` | GET | Add-on version & status |
+| `/api/stats` | GET | Statistics (scenes, devices, active playbacks) |
 
-### Geräte
+### Devices
 
-| Endpoint | Methode | Beschreibung |
-|----------|---------|-------------|
-| `/api/devices` | GET | Alle aktiven Geräte auflisten |
-| `/api/devices` | POST | Neues Gerät anlegen |
-| `/api/devices/{id}` | PUT | Gerät aktualisieren |
-| `/api/devices/{id}` | DELETE | Gerät deaktivieren (soft-delete) |
-| `/api/devices/{id}/health` | GET | WLED Health-Check |
-| `/api/devices/test-frame` | POST | Einzelnen Frame direkt an Geräte senden |
-| `/api/ha/discover` | GET | WLED-Geräte aus HA entdecken |
-| `/api/ha/debug` | GET | HA-Verbindungsdiagnose |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/devices` | GET | List all active devices |
+| `/api/devices` | POST | Create a new device |
+| `/api/devices/{id}` | PUT | Update a device |
+| `/api/devices/{id}` | DELETE | Deactivate a device (soft-delete) |
+| `/api/devices/{id}/health` | GET | WLED health check |
+| `/api/devices/test-frame` | POST | Send a single frame directly to devices |
+| `/api/ha/discover` | GET | Discover WLED devices from HA |
+| `/api/ha/debug` | GET | HA connection diagnostics |
 
-### Szenen
+### Scenes
 
-| Endpoint | Methode | Beschreibung |
-|----------|---------|-------------|
-| `/api/scenes` | GET | Alle aktiven Szenen (inkl. Frames & Devices) |
-| `/api/scenes` | POST | Neue Szene erstellen |
-| `/api/scenes/{id}` | GET | Einzelne Szene lesen |
-| `/api/scenes/{id}` | PUT | Szene aktualisieren |
-| `/api/scenes/{id}` | DELETE | Szene deaktivieren (soft-delete) |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/scenes` | GET | All active scenes (incl. frames & devices) |
+| `/api/scenes` | POST | Create a new scene |
+| `/api/scenes/{id}` | GET | Read a single scene |
+| `/api/scenes/{id}` | PUT | Update a scene |
+| `/api/scenes/{id}` | DELETE | Deactivate a scene (soft-delete) |
 
 ### Playback
 
-| Endpoint | Methode | Beschreibung |
-|----------|---------|-------------|
-| `/api/scenes/{id}/play` | POST | Szene abspielen |
-| `/api/scenes/{id}/stop` | POST | Playback stoppen |
-| `/api/playback/status` | GET | Status aller laufenden Playbacks |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/scenes/{id}/play` | POST | Play a scene |
+| `/api/scenes/{id}/stop` | POST | Stop playback |
+| `/api/playback/status` | GET | Status of all running playbacks |
 
 ### Import/Export
 
-| Endpoint | Methode | Beschreibung |
-|----------|---------|-------------|
-| `/api/scenes/{id}/export` | GET | Szene als `.ledm` Binärdatei |
-| `/api/scenes/import` | POST | `.ledm`-Datei importieren |
-| `/api/image/convert` | POST | Bild in Pixel-Daten konvertieren |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/scenes/{id}/export` | GET | Export scene as `.ledm` binary file |
+| `/api/scenes/import` | POST | Import `.ledm` file |
+| `/api/image/convert` | POST | Convert image to pixel data |
 
 ---
 
@@ -178,25 +178,25 @@ Basis-URL: relativ zum Ingress-Pfad oder `http://<host>:8000`
 
 Endpoint: `/ws`
 
-### Nachrichten vom Client
+### Client Messages
 
-**Preview-Frame senden** (wird an alle anderen Clients weitergeleitet):
+**Send preview frame** (forwarded to all other clients):
 ```json
 {"action": "preview_frame", "data": { ... }}
 ```
 
-**Playback-Status abfragen:**
+**Query playback status:**
 ```json
 {"action": "playback_status"}
 ```
 
-**HA-Aktionen** (an den HA WebSocket Client):
+**HA Actions** (to the HA WebSocket client):
 ```json
 {"action": "get_entities"}
 {"action": "call_service", "domain": "light", "service": "turn_on", "data": {"entity_id": "light.wled"}}
 ```
 
-### Nachrichten vom Server
+### Server Messages
 
 ```json
 {"type": "preview_frame", "data": { ... }}
@@ -206,72 +206,72 @@ Endpoint: `/ws`
 
 ---
 
-## Konfiguration
+## Configuration
 
-### Add-on Optionen (config.yaml)
+### Add-on Options (config.yaml)
 
-| Option | Beschreibung | Standard |
-|--------|-------------|----------|
-| `log_level` | Log-Level: `debug`, `info`, `warning`, `error` | `info` |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `log_level` | Log level: `debug`, `info`, `warning`, `error` | `info` |
 
-### Benötigte Berechtigungen
+### Required Permissions
 
-- **homeassistant_api** — WebSocket-Kommunikation mit HA Core
-- **hassio_api (admin)** — Supervisor-Zugriff
-- **Netzwerk (Port 8000)** — Frontend & API
-- **share:rw, addon_config:rw** — Datenpersistenz
+- **homeassistant_api** — WebSocket communication with HA Core
+- **hassio_api (admin)** — Supervisor access
+- **Network (Port 8000)** — Frontend & API
+- **share:rw, addon_config:rw** — Data persistence
 
-### WLED-Gerät Einstellungen
+### WLED Device Settings
 
-Relevante WLED-Settings unter Settings → Sync:
+Relevant WLED settings under Settings → Sync:
 
-| Setting | Bedeutung |
-|---------|----------|
-| Force Max Brightness | Erzwingt Brightness 255 im Realtime-Mode |
-| Realtime Timeout | Standard-Timeout für Realtime (empfohlen: 5s) |
-| Use Main Segment Only | Nur Hauptsegment für Realtime nutzen |
+| Setting | Description |
+|---------|-------------|
+| Force Max Brightness | Forces brightness 255 in realtime mode |
+| Realtime Timeout | Default timeout for realtime (recommended: 5s) |
+| Use Main Segment Only | Use only the main segment for realtime |
 
 ---
 
-## Fehlerbehebung
+## Troubleshooting
 
-### Add-on startet nicht
+### Add-on won't start
 
 ```bash
 docker logs addon_local_wled_matrix_manager
 ```
 
-Häufige Ursachen:
-- Port 8000 bereits belegt
-- Python-Dependencies fehlerhaft → Add-on neu bauen
+Common causes:
+- Port 8000 already in use
+- Python dependencies broken → Rebuild the add-on
 
-### Frontend zeigt 404
+### Frontend shows 404
 
-- Prüfe ob `frontend/dist/index.html` existiert (im Docker-Image)
-- Vite muss mit `base: './'` gebaut werden (siehe TEMPLATE_GUIDE.md)
+- Check if `frontend/dist/index.html` exists (in the Docker image)
+- Vite must be built with `base: './'` (see TEMPLATE_GUIDE.md)
 
-### WLED-Gerät nicht erreichbar
+### WLED device unreachable
 
-1. IP-Adresse korrekt? → `curl http://<wled-ip>/json/info`
-2. Gerät im gleichen Netzwerk wie HA?
-3. Firewall-Regeln prüfen (UDP Port 21324 für DNRGB)
+1. IP address correct? → `curl http://<wled-ip>/json/info`
+2. Device on the same network as HA?
+3. Check firewall rules (UDP Port 21324 for DNRGB)
 
-### Flash beim Playback-Start
+### Flash on playback start
 
-Vor dem ersten UDP-Frame wird automatisch ein Solid-Black-Effekt gesetzt (300ms Wartezeit). Falls dennoch ein Flash sichtbar ist:
-- Prüfe ob „Force Max Brightness" in WLED deaktiviert ist
-- Erhöhe die Pre-Delay-Zeit
+Before the first UDP frame, a solid-black effect is automatically set (300ms wait). If a flash is still visible:
+- Check if "Force Max Brightness" is disabled in WLED
+- Increase the pre-delay time
 
-Details: [WLED_PROTOCOLS.md](./backend/docs/WLED_PROTOCOLS.md) — Abschnitt „Realtime-Mode Lifecycle"
+Details: [WLED_PROTOCOLS.md](./backend/docs/WLED_PROTOCOLS.md) — Section "Realtime-Mode Lifecycle"
 
-### Add-on nicht in Seitenleiste
+### Add-on not in sidebar
 
-`ingress_panel: true` muss gesetzt sein. Im DevContainer:
+`ingress_panel: true` must be set. In DevContainer:
 ```bash
 ./dev.sh start:addon
 ```
 
-### WebSocket-Verbindung fehlgeschlagen
+### WebSocket connection failed
 
-- Im DevContainer: WebSocket läuft auf `supervisor` Hostname, nicht `localhost`
-- Browser DevTools → Network → WS Tab auf Fehler prüfen
+- In DevContainer: WebSocket runs on the `supervisor` hostname, not `localhost`
+- Browser DevTools → Network → WS tab for errors

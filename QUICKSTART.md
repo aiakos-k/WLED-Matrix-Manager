@@ -1,64 +1,64 @@
 # Quickstart Guide — WLED Matrix Manager
 
-Schnelle Anleitung um mit dem WLED Matrix Manager Setup zu starten.
+Quick guide to get started with the WLED Matrix Manager setup.
 
-## ⚡ 5-Minuten Setup (DevContainer)
+## ⚡ 5-Minute Setup (DevContainer)
 
-### Voraussetzungen
+### Prerequisites
 
-- VS Code mit **Remote Container Extension**
+- VS Code with **Remote Container Extension**
 - Docker Desktop
 - Git
 
 ### Setup
 
 ```bash
-# 1. Repository klonen
+# 1. Clone the repository
 git clone <repository-url>
 cd WLEDMatrixManager
 
-# 2. In VS Code öffnen
+# 2. Open in VS Code
 code .
 
-# 3. Container starten
+# 3. Start the container
 # Command Palette (Ctrl+Shift+P) →
 # "Dev Container: Reopen in Container"
-# → Warten bis Container gebaut ist (1-2 Min)
+# → Wait until the container is built (1-2 min)
 
-# 4. Home Assistant starten (Terminal im Container)
-# Option A: VS Code Task verwenden (Command Palette → "Run Task: Start Home Assistant")
-# Option B: Befehl im Terminal
+# 4. Start Home Assistant (terminal inside the container)
+# Option A: Use a VS Code Task (Command Palette → "Run Task: Start Home Assistant")
+# Option B: Run the command in the terminal
 supervisor_run
 
-# 5. Add-on bauen & starten (in neuem Terminal)
+# 5. Build & start the add-on (in a new terminal)
 ./dev.sh start:addon
 ```
 
-**Fertig!** 🎉
+**Done!** 🎉
 
 - **Home Assistant**: http://localhost:7123
-- **Add-on Dashboard**: In der HA-Seitenleiste → "WLED Matrix Manager"
-- Backend API (direkt): http://localhost:8000
-- Swagger Docs (direkt): http://localhost:8000/docs
+- **Add-on Dashboard**: In the HA sidebar → "WLED Matrix Manager"
+- Backend API (direct): http://localhost:8000
+- Swagger Docs (direct): http://localhost:8000/docs
 
-> Das Add-on wird über **Ingress** in der Seitenleiste angezeigt.
-> Falls es nicht erscheint, `./dev.sh start:addon` nochmal ausführen.
+> The add-on is displayed via **Ingress** in the sidebar.
+> If it doesn't appear, run `./dev.sh start:addon` again.
 
 ---
 
-## 📱 Ohne DevContainer (Lokal)
+## 📱 Without DevContainer (Local)
 
-Wenn du DevContainer nicht nutzen möchtest:
+If you don't want to use DevContainer:
 
 ```bash
-# Backend starten (Terminal 1)
+# Start backend (Terminal 1)
 cd WLEDMatrixManager/backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python main.py
 
-# Frontend starten (Terminal 2)
+# Start frontend (Terminal 2)
 cd WLEDMatrixManager/frontend
 npm install
 npm run dev
@@ -69,38 +69,38 @@ Backend: http://localhost:8000
 
 ---
 
-## 🤔 Erste Schritte
+## 🤔 First Steps
 
-### Backend testen
+### Test the Backend
 
-Öffne http://localhost:8000/docs um die **Swagger API Docs** zu sehen.
+Open http://localhost:8000/docs to see the **Swagger API Docs**.
 
-Probiere aus:
+Try it out:
 
 1. `GET /health` - Health Check
-2. `GET /api/status` - Status abrufen
-3. Weitere Endpoints erkunden
+2. `GET /api/status` - Get status
+3. Explore more endpoints
 
-### Frontend erkunden
+### Explore the Frontend
 
-Öffne http://localhost:3000
+Open http://localhost:3000
 
-Der React Dashboard zeigt:
+The React Dashboard shows:
 
-- Verbindungsstatus zu Backend
-- Entity Liste
-- Buttons zum Testen
+- Connection status to the backend
+- Entity list
+- Buttons for testing
 
-### Code ändern
+### Modify Code
 
-Die Backend & Frontend laufen im **Watch-Modus**:
+Backend & frontend run in **watch mode**:
 
-- Backend: Bearbeite `WLEDMatrixManager/backend/app/*.py` → Automatisch Reload
-- Frontend: Bearbeite `WLEDMatrixManager/frontend/src/**` → Hot Module Reload
+- Backend: Edit `WLEDMatrixManager/backend/app/*.py` → Auto reload
+- Frontend: Edit `WLEDMatrixManager/frontend/src/**` → Hot Module Reload
 
-### Mit Home Assistant verbinden
+### Connect to Home Assistant
 
-Das Add-on verbindet sich automatisch zu Home Assistant über:
+The add-on automatically connects to Home Assistant via:
 
 ```
 ws://supervisor/core/websocket
@@ -110,86 +110,86 @@ Code: `WLEDMatrixManager/backend/app/ha_client.py`
 
 ---
 
-## 🛠️ Nützliche Development Commands
+## 🛠️ Useful Development Commands
 
 ```bash
-# Im DevContainer oder lokal
+# In DevContainer or locally
 
-# Setup (alles installieren)
+# Setup (install everything)
 ./dev.sh setup
 
-# Nur Frontend bauen
+# Build frontend only
 ./dev.sh build:frontend
 
-# Nur Backend testen
+# Test backend only
 ./dev.sh start:backend
 
-# Docker Image bauen
+# Build Docker image
 ./dev.sh build:docker
 
-# Add-on starten (DevContainer)
+# Start add-on (DevContainer)
 ./dev.sh start:addon
 
-# Logs anschauen (DevContainer)
+# View logs (DevContainer)
 ./dev.sh logs
 
-# Alles aufräumen
+# Clean up everything
 ./dev.sh clean
 ```
 
 ---
 
-## 📂 Wichtige Dateien
+## 📂 Important Files
 
-| Datei                                           | Purpose                     |
+| File                                            | Purpose                     |
 | ----------------------------------------------- | --------------------------- |
 | `WLEDMatrixManager/backend/main.py`              | FastAPI Application Entry   |
 | `WLEDMatrixManager/backend/app/ha_client.py`     | HA WebSocket Client         |
 | `WLEDMatrixManager/frontend/src/App.tsx`          | React App                   |
 | `WLEDMatrixManager/frontend/src/api/client.ts`   | Frontend API Client         |
-| `WLEDMatrixManager/config.yaml`                   | Add-on Konfiguration        |
+| `WLEDMatrixManager/config.yaml`                   | Add-on Configuration        |
 | `.devcontainer.json`                               | VS Code DevContainer Config |
 
 ---
 
-## 🐛 Häufige Fehler
+## 🐛 Common Issues
 
 ### "DevContainer is not found"
 
-→ Installiere **Remote Container Extension** in VS Code
+→ Install the **Remote Container Extension** in VS Code
 
-### Backend startet nicht
+### Backend won't start
 
 ```bash
-# Check ob Python 3.11+ installiert ist
+# Check if Python 3.11+ is installed
 python3 --version
 
-# Dependencies neu installieren
+# Reinstall dependencies
 pip install -r requirements.txt
 ```
 
-### Frontend zeigt nichts / 404 Not Found
+### Frontend shows nothing / 404 Not Found
 
 ```bash
-# Backend läuft?
+# Is the backend running?
 curl http://localhost:8000/health
 
-# Frontend neu bauen (wichtig: vite.config.ts muss base: './' haben!)
+# Rebuild frontend (important: vite.config.ts must have base: './')
 cd WLEDMatrixManager/frontend && npm run build
 
-# Add-on neu starten
+# Restart the add-on
 ./dev.sh start:addon
 ```
 
-→ Details zu Ingress-Routing siehe [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md)
+→ For details on Ingress routing see [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md)
 
 ### Onboarding: "Failed to save: Unknown error"
 
-Der DevContainer patcht den Supervisor automatisch beim Start. Falls das fehlschlägt
-(z.B. nach Supervisor-Update), den Patch manuell anwenden:
+The DevContainer patches the Supervisor automatically on start. If this fails
+(e.g., after a Supervisor update), apply the patch manually:
 
 ```bash
-# 1. Patch anwenden
+# 1. Apply the patch
 docker exec hassio_supervisor python3 -c "
 path = '/usr/src/supervisor/supervisor/api/supervisor.py'
 with open(path, 'r') as f:
@@ -204,28 +204,28 @@ else:
     print('already patched or pattern changed')
 "
 
-# 2. Supervisor neustarten (NICHT 'ha supervisor restart' — das löscht den Patch!)
+# 2. Restart the Supervisor (do NOT use 'ha supervisor restart' — it removes the patch!)
 docker restart hassio_supervisor
 
-# 3. ~20 Sekunden warten, dann Onboarding erneut versuchen
+# 3. Wait ~20 seconds, then retry onboarding
 ```
 
-> **Wichtig:** Immer `docker restart hassio_supervisor` verwenden!
-> - `ha supervisor restart` erstellt den Container neu → Patches weg
-> - `pkill` verursacht Kaskade → Docker-Daemon crasht
+> **Important:** Always use `docker restart hassio_supervisor`!
+> - `ha supervisor restart` recreates the container → patches are lost
+> - `pkill` causes a cascade → Docker daemon crashes
 
 ### "Port already in use"
 
 ```bash
-# Port 8000 oder 3000 sind schon belegt
-# Andere Prozesse killen oder andere Ports verwenden
+# Port 8000 or 3000 is already in use
+# Kill other processes or use different ports
 lsof -i :8000  # Find process
 kill -9 <PID>
 ```
 
 ---
 
-## 📚 Weitere Ressourcen
+## 📚 Additional Resources
 
 - [Home Assistant Add-on Docs](https://developers.home-assistant.io/docs/add-ons/)
 - [FastAPI Tutorial](https://fastapi.tiangolo.com/tutorial/)
@@ -234,24 +234,24 @@ kill -9 <PID>
 
 ---
 
-## 💡 Nächste Schritte
+## 💡 Next Steps
 
-1. **Repository forken** - Deine eigene Version erstellen
-2. **README anpassen** - Dein Add-on beschreiben
-3. **Features hinzufügen** - Den Code erweitern
-4. **In Home Assistant testen** - Mit echten Smart Home Devices
-5. **GitHub Actions einrichten** - Automatische Builds
-6. **Publishen** - In Community teilen 🎉
+1. **Fork the repository** - Create your own version
+2. **Customize the README** - Describe your add-on
+3. **Add features** - Extend the code
+4. **Test in Home Assistant** - With real smart home devices
+5. **Set up GitHub Actions** - Automated builds
+6. **Publish** - Share with the community 🎉
 
 ---
 
-## 📖 Weiterführend
+## 📖 Further Reading
 
-- [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md) — Technische Details zu Ingress, Routing und DevContainer-Patches
+- [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md) — Technical details on Ingress, routing, and DevContainer patches
 - [Home Assistant Add-on Docs](https://developers.home-assistant.io/docs/add-ons/)
 
 ---
 
-**Viel Spaß bei der Entwicklung! 🚀**
+**Happy coding! 🚀**
 
-Fragen? → [Community Forum](https://community.home-assistant.io/)
+Questions? → [Community Forum](https://community.home-assistant.io/)

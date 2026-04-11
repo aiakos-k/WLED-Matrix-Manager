@@ -143,6 +143,12 @@ Swagger Docs: `http://<host>:8000/docs`
 - [WLED_PROTOCOLS.md](./wled_matrix_manager/backend/docs/WLED_PROTOCOLS.md) — WLED protocol reference (JSON API, UDP DNRGB, Realtime Mode)
 - [DOCS.md](./wled_matrix_manager/DOCS.md) — Detailed add-on documentation
 
+## Support
+
+If you find this project useful, consider buying me a coffee:
+
+<a href="https://www.buymeacoffee.com/aiakosmk" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
 ## License
 
 This project is licensed under the **European Union Public Licence v. 1.2 (EUPL-1.2)**.

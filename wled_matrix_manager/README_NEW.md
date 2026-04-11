@@ -31,7 +31,7 @@ React Frontend (Ingress UI)
 ## Directory Structure
 
 ```
-WLEDMatrixManager/
+wled_matrix_manager/
 ├── backend/
 │   ├── main.py                 FastAPI App, Lifespan, WebSocket
 │   ├── requirements.txt

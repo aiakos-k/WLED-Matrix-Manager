@@ -15,7 +15,7 @@ Quick guide to get started with the WLED Matrix Manager setup.
 ```bash
 # 1. Clone the repository
 git clone <repository-url>
-cd WLEDMatrixManager
+cd WLED-Matrix-Manager
 
 # 2. Open in VS Code
 code .
@@ -36,7 +36,7 @@ supervisor_run
 
 **Done!** 🎉
 
-- **Home Assistant**: http://localhost:7123
+- **Home Assistant**: http://localst:7123
 - **Add-on Dashboard**: In the HA sidebar → "WLED Matrix Manager"
 - Backend API (direct): http://localhost:8000
 - Swagger Docs (direct): http://localhost:8000/docs
@@ -52,14 +52,14 @@ If you don't want to use DevContainer:
 
 ```bash
 # Start backend (Terminal 1)
-cd WLEDMatrixManager/backend
+cd wled_matrix_manager/backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python main.py
 
 # Start frontend (Terminal 2)
-cd WLEDMatrixManager/frontend
+cd wled_matrix_manager/frontend
 npm install
 npm run dev
 ```
@@ -95,8 +95,8 @@ The React Dashboard shows:
 
 Backend & frontend run in **watch mode**:
 
-- Backend: Edit `WLEDMatrixManager/backend/app/*.py` → Auto reload
-- Frontend: Edit `WLEDMatrixManager/frontend/src/**` → Hot Module Reload
+- Backend: Edit `wled_matrix_manager/backend/app/*.py` → Auto reload
+- Frontend: Edit `wled_matrix_manager/frontend/src/**` → Hot Module Reload
 
 ### Connect to Home Assistant
 
@@ -106,7 +106,7 @@ The add-on automatically connects to Home Assistant via:
 ws://supervisor/core/websocket
 ```
 
-Code: `WLEDMatrixManager/backend/app/ha_client.py`
+Code: `wled_matrix_manager/backend/app/ha_client.py`
 
 ---
 
@@ -143,11 +143,11 @@ Code: `WLEDMatrixManager/backend/app/ha_client.py`
 
 | File                                            | Purpose                     |
 | ----------------------------------------------- | --------------------------- |
-| `WLEDMatrixManager/backend/main.py`              | FastAPI Application Entry   |
-| `WLEDMatrixManager/backend/app/ha_client.py`     | HA WebSocket Client         |
-| `WLEDMatrixManager/frontend/src/App.tsx`          | React App                   |
-| `WLEDMatrixManager/frontend/src/api/client.ts`   | Frontend API Client         |
-| `WLEDMatrixManager/config.yaml`                   | Add-on Configuration        |
+| `wled_matrix_manager/backend/main.py`              | FastAPI Application Entry   |
+| `wled_matrix_manager/backend/app/ha_client.py`     | HA WebSocket Client         |
+| `wled_matrix_manager/frontend/src/App.tsx`          | React App                   |
+| `wled_matrix_manager/frontend/src/api/client.ts`   | Frontend API Client         |
+| `wled_matrix_manager/config.yaml`                   | Add-on Configuration        |
 | `.devcontainer.json`                               | VS Code DevContainer Config |
 
 ---
@@ -175,7 +175,7 @@ pip install -r requirements.txt
 curl http://localhost:8000/health
 
 # Rebuild frontend (important: vite.config.ts must have base: './')
-cd WLEDMatrixManager/frontend && npm run build
+cd wled_matrix_manager/frontend && npm run build
 
 # Restart the add-on
 ./dev.sh start:addon

@@ -11,6 +11,9 @@ for dir in /mnt/supervisor/addons/local/*/; do
   git config --global --add safe.directory "$dir" 2>/dev/null || true
 done
 
+# Create /run/supervisor (required bind mount for HA Core container)
+mkdir -p /run/supervisor
+
 # Create dummy apparmor_parser (not available in DevContainer)
 if ! command -v apparmor_parser &> /dev/null; then
   printf '#!/bin/bash\nexit 0\n' > /usr/local/bin/apparmor_parser
@@ -27,9 +30,9 @@ fi
 
 # Install backend dependencies if Python is available
 if command -v python3 &> /dev/null; then
-  if [ ! -d "WLEDMatrixManager/backend/venv" ]; then
+  if [ ! -d "wled_matrix_manager/backend/venv" ]; then
     echo "📦 Installing backend dependencies..."
-    cd WLEDMatrixManager/backend
+    cd wled_matrix_manager/backend
     python3 -m venv venv --system-site-packages || true
     source venv/bin/activate || . ./venv/bin/activate
     pip install -U pip setuptools wheel
@@ -41,9 +44,9 @@ fi
 
 # Install frontend dependencies
 if command -v npm &> /dev/null || command -v npm &> /dev/null; then
-  if [ ! -d "WLEDMatrixManager/frontend/node_modules" ]; then
+  if [ ! -d "wled_matrix_manager/frontend/node_modules" ]; then
     echo "📦 Installing frontend dependencies..."
-    cd WLEDMatrixManager/frontend
+    cd wled_matrix_manager/frontend
     npm install
     cd ../..
   fi

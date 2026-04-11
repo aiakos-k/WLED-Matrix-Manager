@@ -3,8 +3,8 @@
 
 set -e
 
-ADDON_NAME="WLEDMatrixManager"
-ADDON_PATH="./WLEDMatrixManager"
+ADDON_NAME="wled_matrix_manager"
+ADDON_PATH="./wled_matrix_manager"
 
 echo "🏠 Home Assistant Add-on Development Helper"
 echo "==========================================="
@@ -80,7 +80,7 @@ build_docker() {
   echo -e "${YELLOW}🐳 Building Docker image...${NC}"
   docker build \
     --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.15 \
-    -t addon_wledmatrixmanager:latest \
+    -t addon_wled_matrix_manager:latest \
     "$ADDON_PATH"
   echo -e "${GREEN}✅ Docker image built${NC}"
 }

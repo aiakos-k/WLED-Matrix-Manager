@@ -70,7 +70,7 @@ React Frontend (Ingress UI)
 | **JSON API** (`/json/state`) | Single frames, configuration | unlimited |
 | **UDP DNRGB** (Port 21324) | Real-time streaming, animations | 489/packet (chunked) |
 
-Details: [WLED_PROTOCOLS.md](./WLEDMatrixManager/backend/docs/WLED_PROTOCOLS.md)
+Details: [WLED_PROTOCOLS.md](./wled_matrix_manager/backend/docs/WLED_PROTOCOLS.md)
 
 ## Installation
 
@@ -140,8 +140,8 @@ Swagger Docs: `http://<host>:8000/docs`
 
 - [QUICKSTART.md](./QUICKSTART.md) — DevContainer setup & first steps
 - [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md) — Ingress routing & build architecture
-- [WLED_PROTOCOLS.md](./WLEDMatrixManager/backend/docs/WLED_PROTOCOLS.md) — WLED protocol reference (JSON API, UDP DNRGB, Realtime Mode)
-- [DOCS.md](./WLEDMatrixManager/DOCS.md) — Detailed add-on documentation
+- [WLED_PROTOCOLS.md](./wled_matrix_manager/backend/docs/WLED_PROTOCOLS.md) — WLED protocol reference (JSON API, UDP DNRGB, Realtime Mode)
+- [DOCS.md](./wled_matrix_manager/DOCS.md) — Detailed add-on documentation
 
 ## License
 

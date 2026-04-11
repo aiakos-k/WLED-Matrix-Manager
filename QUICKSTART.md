@@ -36,7 +36,7 @@ supervisor_run
 
 **Done!** 🎉
 
-- **Home Assistant**: http://localst:7123
+- **Home Assistant**: http://localhost:7123
 - **Add-on Dashboard**: In the HA sidebar → "WLED Matrix Manager"
 - Backend API (direct): http://localhost:8000
 - Swagger Docs (direct): http://localhost:8000/docs

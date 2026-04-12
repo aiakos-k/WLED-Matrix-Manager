@@ -29,6 +29,12 @@ LED matrices directly from Home Assistant.
 | JSON API | HTTP-based, for single frames and configuration |
 | UDP DNRGB | Real-time streaming, ideal for animations (up to 489 LEDs/packet) |
 
+## Support
+
+If you find this project useful, consider buying me a coffee:
+
+<a href="https://www.buymeacoffee.com/aiakosmk" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
 ## License
 
 EUPL-1.2 — See [LICENSE](https://eupl.eu/1.2/en/)

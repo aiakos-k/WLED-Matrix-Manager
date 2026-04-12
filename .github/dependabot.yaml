@@ -5,3 +5,13 @@ updates:
     schedule:
       interval: weekly
       time: "06:00"
+  - package-ecosystem: "pip"
+    directory: "/wled_matrix_manager/backend/"
+    schedule:
+      interval: weekly
+      time: "06:00"
+  - package-ecosystem: "npm"
+    directory: "/wled_matrix_manager/frontend/"
+    schedule:
+      interval: weekly
+      time: "06:00"

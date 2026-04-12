@@ -7,7 +7,7 @@
       "version": "3.11"
     },
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "18"
+      "version": "20"
     }
   },
   "postStartCommand": "bash devcontainer_bootstrap",
@@ -15,13 +15,15 @@
   "remoteUser": "root",
   "containerEnv": {
     "WORKSPACE_DIRECTORY": "${containerWorkspaceFolder}",
-    "PYTHONUNBUFFERED": "1"
+    "PYTHONUNBUFFERED": "1",
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}"
   },
   "workspaceFolder": "/mnt/supervisor/addons/local/${localWorkspaceFolderBasename}",
   "workspaceMount": "source=${localWorkspaceFolder},target=${containerWorkspaceFolder},type=bind,consistency=cached",
   "customizations": {
     "vscode": {
       "extensions": [
+        "anthropic.claude-code",
         "timonwong.shellcheck",
         "esbenp.prettier-vscode",
         "ms-python.python",
@@ -68,6 +70,7 @@
   },
   "mounts": [
     "type=volume,target=/var/lib/docker",
-    "type=volume,target=/mnt/supervisor"
+    "type=volume,target=/mnt/supervisor",
+    "source=${localEnv:HOME}/.claude,target=/root/.claude,type=bind,consistency=cached"
   ]
 }

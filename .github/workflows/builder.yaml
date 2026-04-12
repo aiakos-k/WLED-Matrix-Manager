@@ -79,15 +79,28 @@ jobs:
         with:
           path: "./${{ matrix.addon }}"
 
+      - name: Inject image property if absent
+        id: inject_image
+        run: |
+          if [[ "${{ steps.info.outputs.image }}" == "null" ]]; then
+            slug=$(grep '^slug:' "./${{ matrix.addon }}/config.yaml" | awk '{print $2}')
+            image="ghcr.io/${{ github.repository_owner }}/${slug}-{arch}"
+            echo "image: \"${image}\"" >> "./${{ matrix.addon }}/config.yaml"
+            echo "image=${image}" >> $GITHUB_OUTPUT
+            echo "Injected image: ${image}"
+          else
+            echo "image=${{ steps.info.outputs.image }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check if add-on should be built
         id: check
         run: |
-          if [[ "${{ steps.info.outputs.image }}" == "null" ]]; then
+          if [[ "${{ steps.inject_image.outputs.image }}" == "null" ]]; then
             echo "Image property is not defined, skipping build"
             echo "build_arch=false" >> $GITHUB_OUTPUT;
           elif [[ "${{ steps.info.outputs.architectures }}" =~ ${{ matrix.arch }} ]]; then
             echo "build_arch=true" >> $GITHUB_OUTPUT;
-            echo "image=$(echo ${{ steps.info.outputs.image }} | cut -d'/' -f3)" >> $GITHUB_OUTPUT;
+            echo "image=$(echo ${{ steps.inject_image.outputs.image }} | cut -d'/' -f3)" >> $GITHUB_OUTPUT;
             if [[ -z "${{ github.head_ref }}" ]] && [[ "${{ github.event_name }}" == "push" ]]; then
                 echo "BUILD_ARGS=" >> $GITHUB_ENV;
             fi

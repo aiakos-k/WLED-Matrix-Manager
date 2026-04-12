@@ -18,8 +18,6 @@ panel_title: WLED Matrix Manager
 homeassistant_api: true
 hassio_api: true
 hassio_role: admin
-ports:
-  8000/tcp: 8000
 map:
   - share:rw
   - addon_config:rw

@@ -11,7 +11,10 @@ for dir in /mnt/supervisor/addons/local/*/; do
   git config --global --add safe.directory "$dir" 2>/dev/null || true
 done
 
-# Create /run/supervisor (required bind mount for HA Core container)
+# Ensure /run/supervisor is a directory (fix for Home Assistant Core mount)
+if [ -f /run/supervisor ]; then
+  rm -f /run/supervisor
+fi
 mkdir -p /run/supervisor
 
 # Create dummy apparmor_parser (not available in DevContainer)
@@ -43,13 +46,19 @@ if command -v python3 &> /dev/null; then
 fi
 
 # Install frontend dependencies
-if command -v npm &> /dev/null || command -v npm &> /dev/null; then
+if command -v npm &> /dev/null; then
   if [ ! -d "wled_matrix_manager/frontend/node_modules" ]; then
     echo "📦 Installing frontend dependencies..."
     cd wled_matrix_manager/frontend
     npm install
     cd ../..
   fi
+fi
+
+# Install Claude Code CLI
+if command -v npm &> /dev/null && ! command -v claude &> /dev/null; then
+  echo "🤖 Installing Claude Code CLI..."
+  npm install -g @anthropic-ai/claude-code
 fi
 
 # Try to start Home Assistant Supervisor if Docker is available
@@ -87,24 +96,32 @@ patch_supervisor() {
   echo "🔧 Applying DevContainer patches to Supervisor..."
 
   # Patch 1: Skip gateway firewall check (requires systemd/dbus)
-  # Uses regex to handle different supervisor versions (with/without sys_dev check)
+  # Replaces the whole method body with a stub — robust across supervisor versions
   docker exec hassio_supervisor python3 -c "
-import re
 path = '/usr/src/supervisor/supervisor/host/firewall.py'
 with open(path, 'r') as f:
-    content = f.read()
-# Match the public apply_gateway_firewall_rules method regardless of body
-pattern = r'(    async def apply_gateway_firewall_rules\(self\) -> None:\n        \"\"\"[^\"]*\"\"\"\n)(.*?)(?=\n    async def |\n    def |\nclass |\Z)'
-replacement = r'''\1        _LOGGER.info(\"Gateway firewall rules skipped (DevContainer)\")\n'''
-new_content, count = re.subn(pattern, replacement, content, flags=re.DOTALL)
-if count > 0 and 'skipped (DevContainer)' not in content:
-    with open(path, 'w') as f:
-        f.write(new_content)
-    print('patched')
-elif 'skipped (DevContainer)' in content:
-    print('already patched')
-else:
-    print('pattern not found')
+    lines = f.readlines()
+
+new_lines = []
+skip_until_next_method = False
+for line in lines:
+    if skip_until_next_method:
+        if line.startswith('    async def ') or line.startswith('    def '):
+            skip_until_next_method = False
+            new_lines.append(line)
+        continue
+
+    if 'async def apply_gateway_firewall_rules' in line:
+        new_lines.append(line)
+        new_lines.append('        \"\"\"Apply gateway firewall rules - skipped in DevContainer.\"\"\"\n')
+        new_lines.append('        return\n')
+        skip_until_next_method = True
+    else:
+        new_lines.append(line)
+
+with open(path, 'w') as f:
+    f.writelines(new_lines)
+print('patched')
 " 2>/dev/null && echo "  ✅ Firewall patch applied" || echo "  ⚠️  Firewall patch skipped"
 
   # Patch 2: Skip dbus agent call for diagnostics (requires os-agent)
@@ -141,7 +158,7 @@ monitor_supervisor() {
   patch_supervisor
   # Watch for supervisor container recreations
   while true; do
-    docker events --filter "container=hassio_supervisor" --filter "event=start" --format "{{.Status}}" 2>/dev/null | while read -r event; do
+    docker events --filter "container=hassio_supervisor" --filter "event=start" --format "{{.Status}}" 2>/dev/null | while read -r _; do
       echo "🔄 Supervisor container restarted, re-applying patches in 15s..."
       sleep 15
       patch_supervisor
@@ -156,11 +173,10 @@ monitor_supervisor &
 echo ""
 echo "✅ DevContainer initialized!"
 echo ""
-echo "Available commands:"
-echo "  ./dev.sh setup          - Install all dependencies"
-echo "  ./dev.sh start:backend  - Start FastAPI server"
-echo "  ./dev.sh start:frontend - Start React dev server"
-echo "  ./dev.sh start:addon    - Build and start add-on"
-echo "  ./dev.sh logs           - View add-on logs"
+echo "Useful commands:"
+echo "  ./patch_supervisor.sh                                 - Re-patch Supervisor after restart"
+echo "  ha apps rebuild --force local_wled_matrix_manager    - Rebuild add-on from local Dockerfile"
+echo "  ha apps start local_wled_matrix_manager              - Start add-on"
+echo "  docker logs --follow addon_local_wled_matrix_manager - View add-on logs"
 echo ""
 

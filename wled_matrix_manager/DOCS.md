@@ -268,10 +268,19 @@ Details: [WLED_PROTOCOLS.md](./backend/docs/WLED_PROTOCOLS.md) — Section "Real
 
 `ingress_panel: true` must be set. In DevContainer:
 ```bash
-./dev.sh start:addon
+ha apps rebuild --force local_wled_matrix_manager
+ha apps start local_wled_matrix_manager
 ```
 
 ### WebSocket connection failed
 
 - In DevContainer: WebSocket runs on the `supervisor` hostname, not `localhost`
 - Browser DevTools → Network → WS tab for errors
+
+---
+
+## Support
+
+If you find this add-on useful, consider buying me a coffee:
+
+<a href="https://www.buymeacoffee.com/aiakosmk" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" style="height: 60px !important;width: 217px !important;" ></a>

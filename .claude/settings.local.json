@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /home/michael_kraemer/WLEDMatrixManager/.devcontainer*)",
+      "Bash(chmod +x /home/michael_kraemer/WLEDMatrixManager/patch_supervisor.sh)"
+    ]
+  }
+}

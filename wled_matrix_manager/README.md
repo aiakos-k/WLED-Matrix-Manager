@@ -31,9 +31,12 @@ LED matrices directly from Home Assistant.
 
 ## Support
 
-If you find this project useful, consider buying me a coffee:
+If you find this project useful, consider buying me a coffee or donating via PayPal:
 
-<a href="https://www.buymeacoffee.com/aiakosmk" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+<a href="https://www.buymeacoffee.com/aiakosmk" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me a Coffee" height="50"></a>
+
+<a href="https://paypal.me/MKPp1107" target="_blank"><img src="https://raw.githubusercontent.com/stefan-niedermann/paypal-donate-button/master/paypal-donate-button.png" alt="Donate via PayPal" height="70"></a>
+
 
 ## License
 

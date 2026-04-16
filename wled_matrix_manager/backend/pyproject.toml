@@ -1,0 +1,29 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (unused imports, undefined names, …)
+    "I",   # isort (import ordering)
+    "N",   # pep8-naming
+    "UP",  # pyupgrade (modern Python syntax)
+    "S",   # flake8-bandit (security — replaces Bandit)
+    "B",   # flake8-bugbear (common pitfalls)
+    "A",   # flake8-builtins (avoid shadowing builtins)
+    "C4",  # flake8-comprehensions (cleaner comprehensions)
+]
+ignore = [
+    "B008",  # function calls in default args — required by FastAPI (Depends())
+    "S104",  # binding to 0.0.0.0 — intentional in container environment
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]  # allow assert in tests
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

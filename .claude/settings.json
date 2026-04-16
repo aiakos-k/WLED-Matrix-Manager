@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx husky:*)",
+      "Bash(chmod +x /mnt/supervisor/addons/local/WLEDMatrixManager/.husky/pre-commit)"
+    ]
+  }
+}

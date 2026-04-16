@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# ── Frontend: Biome ──────────────────────────────────────────────────────────
+STAGED_TS=$(git diff --cached --name-only --diff-filter=ACMR | grep -E "^wled_matrix_manager/frontend/src/.*\.(ts|tsx|js|jsx)$" || true)
+
+if [ -n "$STAGED_TS" ]; then
+  echo "Biome: checking staged frontend files..."
+  (cd wled_matrix_manager/frontend && npx biome check --write src) || exit 1
+  git add wled_matrix_manager/frontend/src
+fi
+
+# ── Backend: Ruff ────────────────────────────────────────────────────────────
+STAGED_PY=$(git diff --cached --name-only --diff-filter=ACMR | grep "\.py$" || true)
+
+if [ -n "$STAGED_PY" ]; then
+  echo "Ruff: checking staged Python files..."
+  if ! command -v ruff >/dev/null 2>&1; then
+    echo "Error: ruff not found. Install it with: pip install ruff"
+    exit 1
+  fi
+  echo "$STAGED_PY" | xargs ruff check --fix || exit 1
+  echo "$STAGED_PY" | xargs ruff format || exit 1
+  echo "$STAGED_PY" | xargs git add
+fi

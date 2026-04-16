@@ -136,6 +136,12 @@ Swagger Docs: `http://<host>:8000/docs`
 - **s6-overlay** — Process management
 - **Home Assistant Ingress** — Seamless UI integration
 
+### Code Quality & CI
+- **CodeQL** — Static analysis for Python & JavaScript/TypeScript (push/PR on main + weekly on Mondays)
+- **Biome** — Linter & formatter for the React/TypeScript frontend (replaces ESLint)
+- **Ruff** — Linter & formatter for the Python backend
+- **Husky** — Git pre-commit hooks running Biome (frontend) and Ruff (backend) automatically
+
 ## Documentation
 
 - [QUICKSTART.md](./QUICKSTART.md) — DevContainer setup & first steps

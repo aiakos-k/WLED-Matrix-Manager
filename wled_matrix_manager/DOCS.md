@@ -18,7 +18,9 @@
 
 ### Via Home Assistant Add-on Store
 
-1. Go to **Settings → Add-ons → Add-on Store**
+[![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Faiakos-k%2FWLED-Matrix-Manager)
+
+1. Click the button above or go to **Settings → Add-ons → Add-on Store**
 2. Click ⋮ → **Repositories** and add the repository URL
 3. Install **WLED Matrix Manager** from the list
 4. Start the add-on — it appears in the **sidebar**

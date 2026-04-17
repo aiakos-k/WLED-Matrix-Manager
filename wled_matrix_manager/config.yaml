@@ -1,6 +1,6 @@
 # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
 name: WLED Matrix Manager
-version: "0.9.0"
+version: "0.9.2"
 slug: wled_matrix_manager
 description: Create and manage pixel-art scenes for WLED LED matrices
 url: "https://github.com/aiakos-k/WLED-Matrix-Manager/tree/main/wled_matrix_manager"

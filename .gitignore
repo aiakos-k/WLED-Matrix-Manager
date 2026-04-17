@@ -1,0 +1,21 @@
+# Linux core dumps
+core
+core.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+build/
+
+# Editor
+.DS_Store
+*.swp
+*.swo

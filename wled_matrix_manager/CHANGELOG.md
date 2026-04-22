@@ -1,4 +1,7 @@
 <!-- https://developers.home-assistant.io/docs/add-ons/presentation#keeping-a-changelog -->
+## 0.9.3
+
+- HA Enity Sync without number
 
 ## 0.9.2
 

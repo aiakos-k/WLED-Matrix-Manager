@@ -15,8 +15,11 @@ STAGED_PY=$(git diff --cached --name-only --diff-filter=ACMR | grep "\.py$" || t
 if [ -n "$STAGED_PY" ]; then
   echo "Ruff: checking staged Python files..."
   if ! command -v ruff >/dev/null 2>&1; then
-    echo "Error: ruff not found. Install it with: pip install ruff"
-    exit 1
+    echo "ruff not found — installing from requirements-dev.txt..."
+    pip install -r wled_matrix_manager/backend/requirements-dev.txt -q || {
+      echo "Error: ruff installation failed"
+      exit 1
+    }
   fi
   echo "$STAGED_PY" | xargs ruff check --fix || exit 1
   echo "$STAGED_PY" | xargs ruff format || exit 1

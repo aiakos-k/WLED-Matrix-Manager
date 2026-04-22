@@ -11,7 +11,7 @@ import asyncio
 import json
 import logging
 import re
-from typing import Dict, Optional
+from typing import Optional
 
 import aiohttp
 
@@ -41,13 +41,13 @@ class HAEntitySync:
         self._core_api_url: str = ""
         self._token: str = ""
         self._running = False
-        self._listen_task: Optional[asyncio.Task] = None
+        self._listen_task: asyncio.Task | None = None
         self._ws = None
-        self._ws_session: Optional[aiohttp.ClientSession] = None
-        self._scene_meta: Dict[int, dict] = {}  # scene_id -> meta
+        self._ws_session: aiohttp.ClientSession | None = None
+        self._scene_meta: dict[int, dict] = {}  # scene_id -> meta
 
     def _entity_id(self, scene_id: int, name: str) -> str:
-        return f"switch.wled_scene_{scene_id}_{_sanitize_name(name)}"
+        return f"switch.wled_mm_scene_{_sanitize_name(name)}"
 
     async def start(self):
         from .ha_client import get_ha_client
@@ -71,13 +71,13 @@ class HAEntitySync:
         if self._ws:
             try:
                 await self._ws.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"WS close: {e}")
         if self._ws_session:
             try:
                 await self._ws_session.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"WS session close: {e}")
 
     # ─── Public API (called from router.py / scene_playback.py) ──
 
@@ -91,7 +91,7 @@ class HAEntitySync:
         async with async_session() as db:
             result = await db.execute(
                 select(Scene)
-                .where(Scene.is_active == True)
+                .where(Scene.is_active)
                 .options(selectinload(Scene.frames), selectinload(Scene.devices))
             )
             scenes = result.scalars().all()
@@ -188,13 +188,11 @@ class HAEntitySync:
                         logger.debug(f"Entity {entity_id} -> {state}")
                     else:
                         body = await resp.text()
-                        logger.error(
-                            f"Set state {entity_id}: {resp.status} {body[:200]}"
-                        )
+                        logger.error(f"Set state {entity_id}: {resp.status} {body[:200]}")
         except Exception as e:
             logger.error(f"Set state {entity_id}: {e}")
 
-    async def _get_state(self, entity_id: str) -> Optional[dict]:
+    async def _get_state(self, entity_id: str) -> dict | None:
         if not self._core_api_url:
             return None
         try:
@@ -252,9 +250,7 @@ class HAEntitySync:
                     # Auth handshake
                     auth_msg = await self._ws.receive_json()
                     if auth_msg.get("type") == "auth_required":
-                        await self._ws.send_json(
-                            {"type": "auth", "access_token": self._token}
-                        )
+                        await self._ws.send_json({"type": "auth", "access_token": self._token})
                         auth_result = await self._ws.receive_json()
                         if auth_result.get("type") != "auth_ok":
                             logger.warning(f"HAEntitySync WS auth failed at {ws_url}")
@@ -272,9 +268,7 @@ class HAEntitySync:
                     )
                     sub_resp = await self._ws.receive_json()
                     if not sub_resp.get("success", False):
-                        logger.warning(
-                            "HAEntitySync: Failed to subscribe to call_service"
-                        )
+                        logger.warning("HAEntitySync: Failed to subscribe to call_service")
                         continue
 
                     logger.info("HAEntitySync: Listening for switch service calls")
@@ -302,14 +296,14 @@ class HAEntitySync:
                     if self._ws:
                         try:
                             await self._ws.close()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"WS close: {e}")
                         self._ws = None
                     if self._ws_session:
                         try:
                             await self._ws_session.close()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"WS session close: {e}")
                         self._ws_session = None
 
             # Reconnect after delay
@@ -335,7 +329,7 @@ class HAEntitySync:
             entity_ids = [entity_ids]
 
         for entity_id in entity_ids:
-            if not entity_id.startswith("switch.wled_scene_"):
+            if not entity_id.startswith("switch.wled_mm_scene_"):
                 continue
 
             scene_id = self._find_scene(entity_id)
@@ -347,12 +341,16 @@ class HAEntitySync:
             status = get_all_playback_status()
             is_playing = scene_id in status and status[scene_id].get("is_playing")
 
-            logger.info(
-                f"HAEntitySync: {service} scene {scene_id} (playing={is_playing})"
-            )
+            logger.info(f"HAEntitySync: {service} scene {scene_id} (playing={is_playing})")
 
-            if service == "turn_on" and not is_playing:
-                await self._start_scene(scene_id)
+            if service == "turn_on":
+                for sid in list(self._scene_meta):
+                    if sid != scene_id:
+                        sid_status = status.get(sid, {})
+                        if sid_status.get("is_playing"):
+                            await self._stop_scene(sid)
+                if not is_playing:
+                    await self._start_scene(scene_id)
             elif service == "turn_off" and is_playing:
                 await self._stop_scene(scene_id)
             elif service == "toggle":
@@ -361,7 +359,7 @@ class HAEntitySync:
                 else:
                     await self._start_scene(scene_id)
 
-    def _find_scene(self, entity_id: str) -> Optional[int]:
+    def _find_scene(self, entity_id: str) -> int | None:
         for sid, meta in self._scene_meta.items():
             if meta["entity_id"] == entity_id:
                 return sid

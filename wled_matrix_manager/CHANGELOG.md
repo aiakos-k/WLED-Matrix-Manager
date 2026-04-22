@@ -1,4 +1,8 @@
 <!-- https://developers.home-assistant.io/docs/add-ons/presentation#keeping-a-changelog -->
+## 0.9.5
+
+- Fix TypeScript 6.0 build error (baseUrl ignoreDeprecations)
+
 ## 0.9.4
 
 - HA Entity Sync without number in entity ID

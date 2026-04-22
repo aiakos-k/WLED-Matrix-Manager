@@ -1,4 +1,22 @@
 <!-- https://developers.home-assistant.io/docs/add-ons/presentation#keeping-a-changelog -->
+## 0.9.4
+
+- HA Entity Sync without number in entity ID
+- HA Entity Sync: exclusive playback on turn_on (stops other scenes)
+- Bump tj-actions/changed-files from 46 to 47
+- Bump actions/checkout from 4 to 6
+- Bump github/codeql-action from 3 to 4
+- Bump fastapi from 0.104.1 to 0.136.0
+- Bump aiosqlite from 0.19.0 to 0.22.1
+- Bump pydantic-settings from 2.13.1 to 2.14.0
+- Bump python-json-logger from 2.0.7 to 4.1.0
+- Bump vite from 8.0.8 to 8.0.9
+- Bump antd from 5.29.3 to 6.3.6
+- Bump @biomejs/biome from 1.9.4 to 2.4.12
+- Bump uvicorn from 0.24.0 to 0.44.0
+- Bump typescript from 5.9.3 to 6.0.3
+
+
 ## 0.9.3
 
 - HA Enity Sync without number

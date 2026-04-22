@@ -88,6 +88,8 @@ class HAEntitySync:
         from .database import async_session
         from .models import Scene
 
+        await self._cleanup_legacy_entities()
+
         async with async_session() as db:
             result = await db.execute(
                 select(Scene)
@@ -108,6 +110,30 @@ class HAEntitySync:
                 is_playing=False,
             )
         logger.info(f"HAEntitySync: registered {len(scenes)} REST entities")
+
+    async def _cleanup_legacy_entities(self):
+        """Remove old-format switch.wled_scene_* entities left over from previous naming."""
+        if not self._core_api_url:
+            return
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self._core_api_url}/states",
+                    headers={"Authorization": f"Bearer {self._token}"},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status != 200:
+                        return
+                    states = await resp.json()
+
+            legacy = [
+                s["entity_id"] for s in states if s["entity_id"].startswith("switch.wled_scene_")
+            ]
+            for eid in legacy:
+                await self._delete_state(eid)
+                logger.info(f"HAEntitySync: removed legacy entity {eid}")
+        except Exception as e:
+            logger.warning(f"HAEntitySync: legacy cleanup failed: {e}")
 
     async def register_scene(
         self,

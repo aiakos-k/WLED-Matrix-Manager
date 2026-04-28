@@ -15,7 +15,7 @@
   "dependencies": {
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-router-dom": "^7.14.1",
+    "react-router-dom": "^7.14.2",
     "antd": "^6.3.6",
     "@ant-design/icons": "^6.1.1"
   },

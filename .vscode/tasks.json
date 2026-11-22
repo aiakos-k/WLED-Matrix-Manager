@@ -45,6 +45,136 @@
         "panel": "new"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Install Dependencies",
+      "type": "shell",
+      "command": "bash devcontainer_bootstrap",
+      "detail": "Creates the backend venv (uv) and installs frontend dependencies (npm ci)",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Backend (dev)",
+      "type": "shell",
+      "command": "wled_matrix_manager/backend/venv/bin/python -m uvicorn main:app --reload --port 8000",
+      "options": {
+        "cwd": "${workspaceFolder}/wled_matrix_manager/backend"
+      },
+      "detail": "FastAPI on http://localhost:8000/docs",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": {
+        "pattern": {
+          "regexp": ".",
+          "file": 1,
+          "location": 2,
+          "message": 3
+        }
+      }
+    },
+    {
+      "label": "Run Frontend (dev)",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/wled_matrix_manager/frontend"
+      },
+      "detail": "Vite dev server on http://localhost:3000",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": {
+        "pattern": {
+          "regexp": ".",
+          "file": 1,
+          "location": 2,
+          "message": 3
+        }
+      }
+    },
+    {
+      "label": "Lint Backend (ruff)",
+      "type": "shell",
+      "command": "wled_matrix_manager/backend/venv/bin/python -m ruff check .",
+      "options": {
+        "cwd": "${workspaceFolder}/wled_matrix_manager/backend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Format Backend (ruff)",
+      "type": "shell",
+      "command": "wled_matrix_manager/backend/venv/bin/python -m ruff format .",
+      "options": {
+        "cwd": "${workspaceFolder}/wled_matrix_manager/backend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Lint Frontend (biome)",
+      "type": "shell",
+      "command": "npm run lint",
+      "options": {
+        "cwd": "${workspaceFolder}/wled_matrix_manager/frontend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Type-check Frontend (tsc)",
+      "type": "shell",
+      "command": "npm run type-check",
+      "options": {
+        "cwd": "${workspaceFolder}/wled_matrix_manager/frontend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build Frontend",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/wled_matrix_manager/frontend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build Add-on Image (docker)",
+      "type": "shell",
+      "command": "docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.20 --build-arg TEMPIO_VERSION=2024.11.2 --build-arg BUILD_ARCH=amd64 -t local_wled_matrix_manager:dev wled_matrix_manager/",
+      "detail": "Builds the add-on image locally without the Supervisor",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
     }
   ],
   "inputs": [
@@ -53,7 +183,8 @@
       "type": "pickString",
       "description": "Name of addon (to add your addon to this list, please edit .vscode/tasks.json)",
       "options": [
-        "example",
+        "wled_matrix_manager",
+        "example"
       ]
     }
   ]

@@ -31,28 +31,83 @@ if ! command -v python3 &> /dev/null; then
   fi
 fi
 
+# Hash helper (used to detect changed dependency files)
+hash_file() {
+  if command -v sha256sum &> /dev/null; then
+    sha256sum "$1" | cut -d" " -f1
+  else
+    shasum -a 256 "$1" | cut -d" " -f1
+  fi
+}
+
+# Install uv - Home Assistant Core uses uv for its development environment
+# (see https://www.home-assistant.io/development/ - "Install Python with uv")
+if ! command -v uv &> /dev/null; then
+  echo "📦 Installing uv..."
+  if command -v curl &> /dev/null; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh > /dev/null 2>&1 || true
+  elif command -v wget &> /dev/null; then
+    wget -qO- https://astral.sh/uv/install.sh | sh > /dev/null 2>&1 || true
+  fi
+  export PATH="$HOME/.local/bin:$PATH"
+  grep -q ".local/bin" "$HOME/.bashrc" 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+fi
+if ! command -v uv &> /dev/null; then
+  echo "⚠️  uv is not available - falling back to pip/setuptools"
+fi
+
 # Install backend dependencies if Python is available
 if command -v python3 &> /dev/null; then
-  if [ ! -d "wled_matrix_manager/backend/venv" ]; then
-    echo "📦 Installing backend dependencies..."
-    cd wled_matrix_manager/backend
-    python3 -m venv venv --system-site-packages || true
-    source venv/bin/activate || . ./venv/bin/activate
-    pip install -U pip setuptools wheel
-    pip install -r requirements.txt
-    deactivate || true
-    cd ../..
+  cd wled_matrix_manager/backend
+  # The add-on image (ghcr.io/home-assistant/*-base:3.20) ships Python 3.12.
+  # The dev container has to use the same version, otherwise the local
+  # environment drifts away from what runs in production.
+  PY_VERSION="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+  REQ_HASH="$(hash_file requirements.txt)"
+
+  VENV_PY_VERSION=""
+  if [ -x venv/bin/python ] && venv/bin/python -c "import sys" > /dev/null 2>&1; then
+    VENV_PY_VERSION="$(venv/bin/python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "")"
   fi
+
+  if [ "$VENV_PY_VERSION" != "$PY_VERSION" ]; then
+    echo "📦 Creating backend venv (Python $PY_VERSION)..."
+    rm -rf venv
+    if command -v uv &> /dev/null; then
+      uv venv --python "$PY_VERSION" --system-site-packages venv || python3 -m venv venv --system-site-packages
+    else
+      python3 -m venv venv --system-site-packages
+    fi
+  fi
+
+  # Reinstall whenever requirements.txt changes - otherwise the venv silently
+  # keeps the versions it was created with.
+  STAMP="venv/.deps-stamp"
+  if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$REQ_HASH|$PY_VERSION" ]; then
+    echo "📦 Installing backend dependencies..."
+    if command -v uv &> /dev/null; then
+      uv pip install --python venv/bin/python -r requirements.txt \
+        || venv/bin/python -m pip install -r requirements.txt
+    else
+      venv/bin/python -m pip install -U pip setuptools wheel
+      venv/bin/python -m pip install -r requirements.txt
+    fi
+    echo "$REQ_HASH|$PY_VERSION" > "$STAMP"
+  fi
+  cd ../..
 fi
 
 # Install frontend dependencies
 if command -v npm &> /dev/null; then
-  if [ ! -d "wled_matrix_manager/frontend/node_modules" ]; then
+  cd wled_matrix_manager/frontend
+  LOCK_HASH="$(hash_file package-lock.json)"
+  STAMP="node_modules/.deps-stamp"
+  if [ ! -d node_modules ] || [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$LOCK_HASH" ]; then
     echo "📦 Installing frontend dependencies..."
-    cd wled_matrix_manager/frontend
-    npm install
-    cd ../..
+    npm ci
+    echo "$LOCK_HASH" > "$STAMP"
   fi
+  cd ../..
 fi
 
 # Install Claude Code CLI

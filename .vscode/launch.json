@@ -1,0 +1,36 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Backend (FastAPI)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["main:app", "--reload", "--port", "8000"],
+      "cwd": "${workspaceFolder}/wled_matrix_manager/backend",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/wled_matrix_manager/backend"
+      }
+    },
+    {
+      "name": "Backend (FastAPI, no reload)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["main:app", "--port", "8000"],
+      "cwd": "${workspaceFolder}/wled_matrix_manager/backend",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/wled_matrix_manager/backend"
+      }
+    },
+    {
+      "name": "Frontend (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/wled_matrix_manager/frontend/src"
+    }
+  ]
+}

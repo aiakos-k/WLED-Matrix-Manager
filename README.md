@@ -83,7 +83,7 @@ Details: [WLED_PROTOCOLS.md](./wled_matrix_manager/backend/docs/WLED_PROTOCOLS.m
 
 ### Developer Setup
 
-See [QUICKSTART.md](./QUICKSTART.md) for the DevContainer setup.
+See [QUICKSTART.md](./QUICKSTART.md) for the setup in the central `ha-development` platform.
 
 ## Configuration
 
@@ -144,7 +144,7 @@ Swagger Docs: `http://<host>:8000/docs`
 
 ## Documentation
 
-- [QUICKSTART.md](./QUICKSTART.md) — DevContainer setup & first steps
+- [QUICKSTART.md](./QUICKSTART.md) — Setup & first steps (central `ha-development` platform)
 - [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md) — Ingress routing & build architecture
 - [WLED_PROTOCOLS.md](./wled_matrix_manager/backend/docs/WLED_PROTOCOLS.md) — WLED protocol reference (JSON API, UDP DNRGB, Realtime Mode)
 - [DOCS.md](./wled_matrix_manager/DOCS.md) — Detailed add-on documentation

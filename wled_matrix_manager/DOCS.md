@@ -268,15 +268,15 @@ Details: [WLED_PROTOCOLS.md](./backend/docs/WLED_PROTOCOLS.md) — Section "Real
 
 ### Add-on not in sidebar
 
-`ingress_panel: true` must be set. In DevContainer:
+`ingress_panel: true` must be set. In the central platform (`~/ha-development`):
 ```bash
-ha apps rebuild --force local_wled_matrix_manager
-ha apps start local_wled_matrix_manager
+bash scripts/ha-stack.sh apps rebuild local_wled_matrix_manager
+bash scripts/ha-stack.sh apps start   local_wled_matrix_manager
 ```
 
 ### WebSocket connection failed
 
-- In DevContainer: WebSocket runs on the `supervisor` hostname, not `localhost`
+- In the add-on container: WebSocket runs on the `supervisor` hostname, not `localhost`
 - Browser DevTools → Network → WS tab for errors
 
 ---

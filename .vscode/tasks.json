@@ -2,30 +2,32 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Start Home Assistant",
+      "label": "HA-Stack starten (zentral)",
       "type": "shell",
-      "command": "supervisor_run",
-      "group": {
-        "kind": "test",
-        "isDefault": true
-      },
+      "command": "bash ../../scripts/ha-stack.sh up",
       "presentation": {
         "reveal": "always",
-        "panel": "new"
+        "panel": "shared"
       },
       "problemMatcher": []
     },
     {
-      "label": "Start Addon",
+      "label": "Add-on installieren (zentral)",
       "type": "shell",
-      "command": "ha addons stop \"local_${input:addonName}\"; ha addons start \"local_${input:addonName}\"; docker logs --follow \"addon_local_${input:addonName}\"",
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      },
+      "command": "bash ../../scripts/ha-stack.sh apps install local_${input:appName}",
       "presentation": {
         "reveal": "always",
-        "panel": "new"
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Add-on neu bauen und starten (zentral)",
+      "type": "shell",
+      "command": "bash ../../scripts/ha-stack.sh apps rebuild local_${input:appName} && bash ../../scripts/ha-stack.sh apps start local_${input:appName}",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
       },
       "problemMatcher": [],
       "runOptions": {
@@ -33,27 +35,23 @@
       }
     },
     {
-      "label": "Rebuild and Start Addon",
+      "label": "Add-on-Logs (zentral)",
       "type": "shell",
-      "command": "ha addons rebuild --force \"local_${input:addonName}\"; ha addons start \"local_${input:addonName}\"; docker logs --follow \"addon_local_${input:addonName}\"",
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      },
+      "command": "bash ../../scripts/ha-stack.sh logs local_${input:appName}",
       "presentation": {
         "reveal": "always",
-        "panel": "new"
+        "panel": "shared"
       },
       "problemMatcher": []
     }
   ],
   "inputs": [
     {
-      "id": "addonName",
+      "id": "appName",
       "type": "pickString",
-      "description": "Name of addon (to add your addon to this list, please edit .vscode/tasks.json)",
+      "description": "Add-on (Slug ohne 'local_')",
       "options": [
-        "example",
+        "wled_matrix_manager"
       ]
     }
   ]

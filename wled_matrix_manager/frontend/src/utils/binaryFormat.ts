@@ -150,20 +150,11 @@ export function sceneToBinary(scene: BinaryScene): ArrayBuffer {
     o += 4;
     view.setUint8(o, f.brightness);
     o += 1;
-    view.setUint8(
-      o,
-      Math.min(255, Math.max(0, Math.round((f.color_r ?? 100) * 2.55))),
-    );
+    view.setUint8(o, Math.min(255, Math.max(0, Math.round((f.color_r ?? 100) * 2.55))));
     o += 1;
-    view.setUint8(
-      o,
-      Math.min(255, Math.max(0, Math.round((f.color_g ?? 100) * 2.55))),
-    );
+    view.setUint8(o, Math.min(255, Math.max(0, Math.round((f.color_g ?? 100) * 2.55))));
     o += 1;
-    view.setUint8(
-      o,
-      Math.min(255, Math.max(0, Math.round((f.color_b ?? 100) * 2.55))),
-    );
+    view.setUint8(o, Math.min(255, Math.max(0, Math.round((f.color_b ?? 100) * 2.55))));
     o += 1;
     const pixels = f.pixel_data?.pixels || [];
     view.setUint32(o, pixels.length, true);

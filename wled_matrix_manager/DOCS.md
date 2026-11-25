@@ -221,7 +221,7 @@ Endpoint: `/ws`
 - **homeassistant_api** — WebSocket communication with HA Core
 - **hassio_api (admin)** — Supervisor access
 - **Network (Port 8000)** — Frontend & API
-- **share:rw, addon_config:rw** — Data persistence
+- **share:rw, app_config:rw** — Data persistence
 
 ### WLED Device Settings
 

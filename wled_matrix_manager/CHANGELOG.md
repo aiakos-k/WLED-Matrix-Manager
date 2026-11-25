@@ -1,4 +1,17 @@
-<!-- https://developers.home-assistant.io/docs/add-ons/presentation#keeping-a-changelog -->
+<!-- https://contributors.home-assistant.io/apps/reference/#keeping-a-changelog -->
+## 0.10.0
+
+- Remove the `image:` field from `config.yaml`, so the Supervisor builds the
+  add-on locally from the Dockerfile (local code changes are used directly)
+- Replace the deprecated `build.yaml` with `ARG BUILD_FROM` in the Dockerfile
+- Rename the deprecated `map: addon_config` to `map: app_config`
+- Migrate the service definitions from the legacy `/etc/services.d` layout to
+  S6 overlay v3 (`/etc/s6-overlay/s6-rc.d`) with a user bundle
+- Use `TARGETARCH` instead of `BUILD_ARCH` for the tempio download
+- Add the `io.hass.*` image labels
+- Migrate the Biome configuration to schema 2.x and fix the reported findings
+- Stop tracking `node_modules/`
+
 ## 0.9.6
 
 - Remove legacy switch.wled_scene_* entities on startup

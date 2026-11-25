@@ -6,7 +6,7 @@
 // Compute the API base path once at load time.
 // In HA ingress the page is served at /api/hassio_ingress/<token>/
 // so API calls must go through the same prefix.
-const BASE = window.location.pathname.replace(/\/$/, "") + "/api";
+const BASE = `${window.location.pathname.replace(/\/$/, "")}/api`;
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE}${path}`;
@@ -89,8 +89,7 @@ export interface HADevice {
   attributes: Record<string, unknown>;
 }
 
-export const discoverHADevices = () =>
-  request<{ devices: HADevice[] }>("/ha/discover");
+export const discoverHADevices = () => request<{ devices: HADevice[] }>("/ha/discover");
 
 // ─── Scenes ─────────────────────────────────────────────
 
@@ -161,9 +160,7 @@ export const stopScene = (id: number) =>
   request<{ success: boolean }>(`/scenes/${id}/stop`, { method: "POST" });
 
 export const getPlaybackStatus = () =>
-  request<Record<string, { is_playing: boolean; loop_mode: string }>>(
-    "/playback/status",
-  );
+  request<Record<string, { is_playing: boolean; loop_mode: string }>>("/playback/status");
 
 // ─── Test Frame (send directly to device) ───────────────
 
@@ -191,23 +188,15 @@ export const exportScene = async (id: number): Promise<Blob> => {
 export const importScene = async (file: File) => {
   const form = new FormData();
   form.append("file", file);
-  return request<{ success: boolean; scene_id: number; name: string }>(
-    "/scenes/import",
-    {
-      method: "POST",
-      body: form,
-    },
-  );
+  return request<{ success: boolean; scene_id: number; name: string }>("/scenes/import", {
+    method: "POST",
+    body: form,
+  });
 };
 
 // ─── Image ──────────────────────────────────────────────
 
-export const convertImage = async (
-  file: File,
-  width: number,
-  height: number,
-  colors = 256,
-) => {
+export const convertImage = async (file: File, width: number, height: number, colors = 256) => {
   const form = new FormData();
   form.append("file", file);
   return request<{

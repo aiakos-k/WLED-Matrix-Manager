@@ -1,31 +1,58 @@
-import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Button, Card, Col, Divider, Form, Input, InputNumber, message, Modal,
-  Row, Select, Space, Table, Tag, Popconfirm, Spin, Alert, Typography,
-} from 'antd';
-import {
-  PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined,
-  CheckCircleOutlined, CloseCircleOutlined, SyncOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  DeleteOutlined,
+  EditOutlined,
   HomeOutlined,
-} from '@ant-design/icons';
+  PlusOutlined,
+  SearchOutlined,
+  SyncOutlined,
+} from "@ant-design/icons";
 import {
-  getDevices, createDevice, updateDevice, deleteDevice,
-  checkDeviceHealth, discoverHADevices,
-  type DeviceData, type HADevice,
-} from '@/api/client';
+  Alert,
+  Button,
+  Card,
+  Col,
+  Divider,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  message,
+  Popconfirm,
+  Row,
+  Select,
+  Space,
+  Spin,
+  Table,
+  Tag,
+  Typography,
+} from "antd";
+import type React from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  checkDeviceHealth,
+  createDevice,
+  type DeviceData,
+  deleteDevice,
+  discoverHADevices,
+  getDevices,
+  type HADevice,
+  updateDevice,
+} from "@/api/client";
 
 const { Text } = Typography;
 
 const PROTOCOLS = [
-  { value: 'udp_dnrgb', label: 'UDP DNRGB (Recommended)' },
-  { value: 'json_api', label: 'JSON API (HTTP)' },
+  { value: "udp_dnrgb", label: "UDP DNRGB (Recommended)" },
+  { value: "json_api", label: "JSON API (HTTP)" },
 ];
 
 const SCALE_MODES = [
-  { value: 'stretch', label: 'Stretch (resize to fit)' },
-  { value: 'tile', label: 'Tile (repeat pattern)' },
-  { value: 'center', label: 'Center (pad with black)' },
-  { value: 'none', label: 'None (1:1, crop if larger)' },
+  { value: "stretch", label: "Stretch (resize to fit)" },
+  { value: "tile", label: "Tile (repeat pattern)" },
+  { value: "center", label: "Center (pad with black)" },
+  { value: "none", label: "None (1:1, crop if larger)" },
 ];
 
 const Devices: React.FC = () => {
@@ -48,13 +75,15 @@ const Devices: React.FC = () => {
       const d = await getDevices();
       setDevices(d);
     } catch {
-      message.error('Failed to load devices');
+      message.error("Failed to load devices");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // Health checks
   useEffect(() => {
@@ -68,7 +97,7 @@ const Devices: React.FC = () => {
           } catch {
             results[d.id] = false;
           }
-        }),
+        })
       );
       setHealthMap(results);
     };
@@ -120,17 +149,17 @@ const Devices: React.FC = () => {
       const values = await form.validateFields();
       if (editDevice) {
         await updateDevice(editDevice.id, values);
-        message.success('Device updated');
+        message.success("Device updated");
       } else {
         await createDevice(values);
-        message.success('Device added');
+        message.success("Device added");
       }
       setModalOpen(false);
       form.resetFields();
       setEditDevice(null);
       load();
     } catch {
-      message.error('Please fill required fields');
+      message.error("Please fill required fields");
     }
   };
 
@@ -144,10 +173,10 @@ const Devices: React.FC = () => {
   const handleDelete = async (id: number) => {
     try {
       await deleteDevice(id);
-      message.success('Device removed');
+      message.success("Device removed");
       load();
     } catch {
-      message.error('Delete failed');
+      message.error("Delete failed");
     }
   };
 
@@ -161,10 +190,10 @@ const Devices: React.FC = () => {
       setHaOptions(result.devices); // also update the inline Select cache
       setDiscoveryOpen(true);
       if (result.devices.length === 0) {
-        message.info('No WLED devices found in Home Assistant');
+        message.info("No WLED devices found in Home Assistant");
       }
     } catch {
-      message.warning('Device discovery not available (not running in Home Assistant?)');
+      message.warning("Device discovery not available (not running in Home Assistant?)");
     } finally {
       setDiscovering(false);
     }
@@ -178,10 +207,10 @@ const Devices: React.FC = () => {
       ha_entity_id: haDevice.entity_id,
       matrix_width: 16,
       matrix_height: 16,
-      communication_protocol: 'udp_dnrgb',
+      communication_protocol: "udp_dnrgb",
       chain_count: 1,
       segment_id: 0,
-      scale_mode: 'stretch',
+      scale_mode: "stretch",
     });
     setDiscoveryOpen(false);
     setEditDevice(null);
@@ -191,44 +220,50 @@ const Devices: React.FC = () => {
 
   const columns = [
     {
-      title: 'Status',
-      dataIndex: 'id',
-      key: 'status',
+      title: "Status",
+      dataIndex: "id",
+      key: "status",
       width: 70,
       render: (id: number) =>
         healthMap[id] === true ? (
-          <Tag icon={<CheckCircleOutlined />} color="success">Online</Tag>
+          <Tag icon={<CheckCircleOutlined />} color="success">
+            Online
+          </Tag>
         ) : healthMap[id] === false ? (
-          <Tag icon={<CloseCircleOutlined />} color="error">Offline</Tag>
+          <Tag icon={<CloseCircleOutlined />} color="error">
+            Offline
+          </Tag>
         ) : (
-          <Tag icon={<SyncOutlined spin />} color="processing">...</Tag>
+          <Tag icon={<SyncOutlined spin />} color="processing">
+            ...
+          </Tag>
         ),
     },
-    { title: 'Name', dataIndex: 'name', key: 'name' },
-    { title: 'IP Address', dataIndex: 'ip_address', key: 'ip' },
+    { title: "Name", dataIndex: "name", key: "name" },
+    { title: "IP Address", dataIndex: "ip_address", key: "ip" },
     {
-      title: 'Matrix',
-      key: 'matrix',
+      title: "Matrix",
+      key: "matrix",
       render: (_: unknown, d: DeviceData) => `${d.matrix_width}×${d.matrix_height}`,
     },
     {
-      title: 'Protocol',
-      dataIndex: 'communication_protocol',
-      key: 'protocol',
+      title: "Protocol",
+      dataIndex: "communication_protocol",
+      key: "protocol",
       render: (p: string) => (
-        <Tag color={p === 'udp_dnrgb' ? 'blue' : 'green'}>
-          {p === 'udp_dnrgb' ? 'UDP DNRGB' : 'JSON API'}
+        <Tag color={p === "udp_dnrgb" ? "blue" : "green"}>
+          {p === "udp_dnrgb" ? "UDP DNRGB" : "JSON API"}
         </Tag>
       ),
     },
     {
-      title: 'Chains',
-      dataIndex: 'chain_count',
-      key: 'chains',
+      title: "Chains",
+      dataIndex: "chain_count",
+      key: "chains",
     },
     {
-      title: 'Actions',
-      key: 'actions',
+      title: "Actions",
+      key: "actions",
       render: (_: unknown, d: DeviceData) => (
         <Space size={4}>
           <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(d)} />
@@ -240,27 +275,41 @@ const Devices: React.FC = () => {
     },
   ];
 
-  if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 80 }} />;
+  if (loading) return <Spin size="large" style={{ display: "block", marginTop: 80 }} />;
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 16,
+        }}
+      >
         <h2 style={{ margin: 0 }}>Devices</h2>
         <Space>
           <Button icon={<SearchOutlined />} onClick={handleDiscover} loading={discovering}>
             Discover from HA
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-            setEditDevice(null);
-            form.resetFields();
-            form.setFieldsValue({
-              matrix_width: 16, matrix_height: 16,
-              communication_protocol: 'udp_dnrgb', chain_count: 1, segment_id: 0,
-              scale_mode: 'stretch',
-            });
-            setHaLinked(false);
-            setModalOpen(true);
-          }}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              setEditDevice(null);
+              form.resetFields();
+              form.setFieldsValue({
+                matrix_width: 16,
+                matrix_height: 16,
+                communication_protocol: "udp_dnrgb",
+                chain_count: 1,
+                segment_id: 0,
+                scale_mode: "stretch",
+              });
+              setHaLinked(false);
+              setModalOpen(true);
+            }}
+          >
             Add Device
           </Button>
         </Space>
@@ -271,9 +320,14 @@ const Devices: React.FC = () => {
       {/* Add/Edit Modal */}
       <Modal
         open={modalOpen}
-        title={editDevice ? 'Edit Device' : 'Add Device'}
+        title={editDevice ? "Edit Device" : "Add Device"}
         onOk={handleSave}
-        onCancel={() => { setModalOpen(false); setEditDevice(null); setHaLinked(false); form.resetFields(); }}
+        onCancel={() => {
+          setModalOpen(false);
+          setEditDevice(null);
+          setHaLinked(false);
+          form.resetFields();
+        }}
         okText="Save"
         width={520}
       >
@@ -294,20 +348,22 @@ const Devices: React.FC = () => {
               allowClear
               placeholder="Search WLED devices in Home Assistant..."
               loading={haLoading}
-              onDropdownVisibleChange={(open) => { if (open) loadHAOptions(); }}
+              onDropdownVisibleChange={(open) => {
+                if (open) loadHAOptions();
+              }}
               filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
               options={haOptions.map((d) => ({
                 value: d.entity_id,
-                label: `${d.name}${d.ip_address ? ` (${d.ip_address})` : ''} — ${d.entity_id}`,
+                label: `${d.name}${d.ip_address ? ` (${d.ip_address})` : ""} — ${d.entity_id}`,
               }))}
-              onChange={(val) => val ? onHAEntitySelect(val) : onHAEntityClear()}
-              notFoundContent={haLoading ? <Spin size="small" /> : 'No WLED devices found'}
+              onChange={(val) => (val ? onHAEntitySelect(val) : onHAEntityClear())}
+              notFoundContent={haLoading ? <Spin size="small" /> : "No WLED devices found"}
             />
           </Form.Item>
 
-          <Divider style={{ margin: '8px 0 16px' }} />
+          <Divider style={{ margin: "8px 0 16px" }} />
 
           <Form.Item name="name" label="Name" rules={[{ required: true }]}>
             <Input placeholder="Living Room Matrix" disabled={haLinked} />
@@ -315,20 +371,26 @@ const Devices: React.FC = () => {
           <Form.Item
             name="ip_address"
             label="IP Address"
-            rules={[{ required: true, message: 'IP address is required for device communication' }]}
-            extra={haLinked ? <Text type="secondary">Managed by Home Assistant</Text> : <Text type="secondary">Required — used for UDP/HTTP communication with WLED</Text>}
+            rules={[{ required: true, message: "IP address is required for device communication" }]}
+            extra={
+              haLinked ? (
+                <Text type="secondary">Managed by Home Assistant</Text>
+              ) : (
+                <Text type="secondary">Required — used for UDP/HTTP communication with WLED</Text>
+              )
+            }
           >
             <Input placeholder="192.168.1.100" disabled={haLinked} />
           </Form.Item>
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="matrix_width" label="Width">
-                <InputNumber min={1} max={256} style={{ width: '100%' }} />
+                <InputNumber min={1} max={256} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item name="matrix_height" label="Height">
-                <InputNumber min={1} max={256} style={{ width: '100%' }} />
+                <InputNumber min={1} max={256} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
           </Row>
@@ -338,17 +400,20 @@ const Devices: React.FC = () => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="chain_count" label="Chain Count">
-                <InputNumber min={1} max={16} style={{ width: '100%' }} />
+                <InputNumber min={1} max={16} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item name="segment_id" label="Segment ID">
-                <InputNumber min={0} max={15} style={{ width: '100%' }} />
+                <InputNumber min={0} max={15} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="scale_mode" label="Scale Mode"
-            extra="How to map scene pixels when scene and device sizes differ">
+          <Form.Item
+            name="scale_mode"
+            label="Scale Mode"
+            extra="How to map scene pixels when scene and device sizes differ"
+          >
             <Select options={SCALE_MODES} />
           </Form.Item>
         </Form>
@@ -367,16 +432,24 @@ const Devices: React.FC = () => {
         ) : (
           <div>
             {haDevices.map((d) => {
-              const alreadyAdded = devices.some((dev) => dev.ha_entity_id === d.entity_id || dev.ip_address === d.ip_address);
+              const alreadyAdded = devices.some(
+                (dev) => dev.ha_entity_id === d.entity_id || dev.ip_address === d.ip_address
+              );
               return (
                 <Card key={d.entity_id} size="small" style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
                     <div>
                       <strong>{d.name}</strong>
                       <br />
-                      <span style={{ color: '#888' }}>{d.entity_id}</span>
+                      <span style={{ color: "#888" }}>{d.entity_id}</span>
                       {d.ip_address && <span style={{ marginLeft: 8 }}>({d.ip_address})</span>}
-                      <Tag color={d.state === 'on' ? 'green' : 'default'} style={{ marginLeft: 8 }}>
+                      <Tag color={d.state === "on" ? "green" : "default"} style={{ marginLeft: 8 }}>
                         {d.state}
                       </Tag>
                     </div>
@@ -386,7 +459,7 @@ const Devices: React.FC = () => {
                       disabled={alreadyAdded}
                       onClick={() => addFromHA(d)}
                     >
-                      {alreadyAdded ? 'Already Added' : 'Add'}
+                      {alreadyAdded ? "Already Added" : "Add"}
                     </Button>
                   </div>
                 </Card>

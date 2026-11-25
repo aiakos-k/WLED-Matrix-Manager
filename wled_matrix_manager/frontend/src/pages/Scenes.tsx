@@ -1,33 +1,46 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Card, Row, Col, Button, Space, Tag, Tooltip, message, Upload, Popconfirm, Spin } from 'antd';
 import {
-  PlusOutlined,
-  PlayCircleOutlined,
-  StopOutlined,
+  ApiOutlined,
+  DeleteOutlined,
   EditOutlined,
   ExportOutlined,
-  DeleteOutlined,
-  ImportOutlined,
   EyeOutlined,
-  ApiOutlined,
-} from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+  ImportOutlined,
+  PlayCircleOutlined,
+  PlusOutlined,
+  StopOutlined,
+} from "@ant-design/icons";
 import {
-  getScenes,
-  playScene,
-  stopScene,
+  Button,
+  Card,
+  Col,
+  message,
+  Popconfirm,
+  Row,
+  Space,
+  Spin,
+  Tag,
+  Tooltip,
+  Upload,
+} from "antd";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  type DeviceData,
   deleteScene,
   exportScene,
-  importScene,
-  getPlaybackStatus,
-  type SceneData,
   getDevices,
-  type DeviceData,
-} from '@/api/client';
+  getPlaybackStatus,
+  getScenes,
+  importScene,
+  playScene,
+  type SceneData,
+  stopScene,
+} from "@/api/client";
 
 /** Draw first frame of scene onto a canvas */
 function drawPreview(canvas: HTMLCanvasElement, scene: SceneData) {
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   if (!ctx || !scene.frames.length) return;
 
   const frame = scene.frames[0];
@@ -36,7 +49,7 @@ function drawPreview(canvas: HTMLCanvasElement, scene: SceneData) {
   canvas.width = w;
   canvas.height = h;
 
-  ctx.fillStyle = '#000';
+  ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, w, h);
 
   for (const px of frame.pixel_data?.pixels || []) {
@@ -67,10 +80,24 @@ const SceneCard: React.FC<{
     <Card
       hoverable
       cover={
-        <div style={{ background: '#000', display: 'flex', justifyContent: 'center', padding: 8, minHeight: 120 }}>
+        <div
+          style={{
+            background: "#000",
+            display: "flex",
+            justifyContent: "center",
+            padding: 8,
+            minHeight: 120,
+          }}
+        >
           <canvas
             ref={canvasRef}
-            style={{ imageRendering: 'pixelated', width: '100%', maxWidth: 200, height: 'auto', aspectRatio: '1' }}
+            style={{
+              imageRendering: "pixelated",
+              width: "100%",
+              maxWidth: 200,
+              height: "auto",
+              aspectRatio: "1",
+            }}
           />
         </div>
       }
@@ -82,12 +109,14 @@ const SceneCard: React.FC<{
       <div style={{ marginTop: 8 }}>
         <Space size={4} wrap>
           <Tag color="blue">{scene.frame_count} frames</Tag>
-          <Tag color={scene.loop_mode === 'loop' ? 'green' : 'orange'}>
-            {scene.loop_mode === 'loop' ? 'Loop' : 'Once'}
+          <Tag color={scene.loop_mode === "loop" ? "green" : "orange"}>
+            {scene.loop_mode === "loop" ? "Loop" : "Once"}
           </Tag>
           {deviceNames.length > 0 ? (
-            deviceNames.map((name, i) => (
-              <Tag key={i} icon={<ApiOutlined />} color="purple">{name}</Tag>
+            deviceNames.map((name) => (
+              <Tag key={name} icon={<ApiOutlined />} color="purple">
+                {name}
+              </Tag>
             ))
           ) : (
             <Tag color="default">No device</Tag>
@@ -105,8 +134,12 @@ const SceneCard: React.FC<{
               Play
             </Button>
           )}
-          <Button icon={<EditOutlined />} onClick={onEdit} size="small">Edit</Button>
-          <Button icon={<ExportOutlined />} onClick={onExport} size="small">Export</Button>
+          <Button icon={<EditOutlined />} onClick={onEdit} size="small">
+            Edit
+          </Button>
+          <Button icon={<ExportOutlined />} onClick={onExport} size="small">
+            Export
+          </Button>
           <Popconfirm title="Delete this scene?" onConfirm={onDelete} okText="Yes" cancelText="No">
             <Button icon={<DeleteOutlined />} danger size="small" />
           </Popconfirm>
@@ -131,7 +164,7 @@ const Scenes: React.FC = () => {
       setDevices(devs);
       setDevices(devs);
     } catch {
-      message.error('Failed to load scenes');
+      message.error("Failed to load scenes");
     } finally {
       setLoading(false);
     }
@@ -146,20 +179,20 @@ const Scenes: React.FC = () => {
   const handlePlay = async (id: number) => {
     try {
       await playScene(id);
-      message.success('Playback started');
+      message.success("Playback started");
       load();
     } catch {
-      message.error('Failed to start playback');
+      message.error("Failed to start playback");
     }
   };
 
   const handleStop = async (id: number) => {
     try {
       await stopScene(id);
-      message.success('Playback stopped');
+      message.success("Playback stopped");
       load();
     } catch {
-      message.error('Failed to stop playback');
+      message.error("Failed to stop playback");
     }
   };
 
@@ -167,23 +200,23 @@ const Scenes: React.FC = () => {
     try {
       const blob = await exportScene(id);
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `${name.replace(/[^a-z0-9_-]/gi, '_')}.ledm`;
+      a.download = `${name.replace(/[^a-z0-9_-]/gi, "_")}.ledm`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      message.error('Export failed');
+      message.error("Export failed");
     }
   };
 
   const handleDelete = async (id: number) => {
     try {
       await deleteScene(id);
-      message.success('Scene deleted');
+      message.success("Scene deleted");
       load();
     } catch {
-      message.error('Delete failed');
+      message.error("Delete failed");
     }
   };
 
@@ -193,25 +226,35 @@ const Scenes: React.FC = () => {
       message.success(`Imported: ${result.name}`);
       load();
     } catch {
-      message.error('Import failed');
+      message.error("Import failed");
     }
     return false; // Prevent default Upload behavior
   };
 
-  if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 80 }} />;
+  if (loading) return <Spin size="large" style={{ display: "block", marginTop: 80 }} />;
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 16,
+        }}
+      >
         <h2 style={{ margin: 0 }}>Scenes</h2>
         <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/scenes/new')}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate("/scenes/new")}>
             Create New Scene
           </Button>
           <Upload
             accept=".ledm"
             showUploadList={false}
-            beforeUpload={(file) => { handleImport(file); return false; }}
+            beforeUpload={(file) => {
+              handleImport(file);
+              return false;
+            }}
           >
             <Button icon={<ImportOutlined />}>Import Scene</Button>
           </Upload>
@@ -220,8 +263,8 @@ const Scenes: React.FC = () => {
 
       <Row gutter={[16, 16]}>
         {scenes.map((scene) => {
-          const devMap = new Map(devices.map(d => [d.id, d.name]));
-          const devNames = (scene.device_ids || []).map(id => devMap.get(id) || `Device #${id}`);
+          const devMap = new Map(devices.map((d) => [d.id, d.name]));
+          const devNames = (scene.device_ids || []).map((id) => devMap.get(id) || `Device #${id}`);
           return (
             <Col key={scene.id} xs={24} sm={12} md={8} lg={6}>
               <SceneCard
@@ -239,9 +282,13 @@ const Scenes: React.FC = () => {
         })}
         {scenes.length === 0 && (
           <Col span={24}>
-            <Card style={{ textAlign: 'center', padding: 48 }}>
+            <Card style={{ textAlign: "center", padding: 48 }}>
               <p>No scenes yet. Create your first pixel art!</p>
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/scenes/new')}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => navigate("/scenes/new")}
+              >
                 Create Scene
               </Button>
             </Card>

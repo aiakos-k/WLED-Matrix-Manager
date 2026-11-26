@@ -8,7 +8,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import aiohttp
 
@@ -46,14 +46,14 @@ def _read_token() -> str:
 
 class HAClient:
     def __init__(self):
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.ws: Optional[aiohttp.ClientWebSocketResponse] = None
+        self.session: aiohttp.ClientSession | None = None
+        self.ws: aiohttp.ClientWebSocketResponse | None = None
         self.connected = False
         self.authenticated = False
         self.auth_token: str = ""
         self.core_token: str = ""  # might differ from auth_token
         self._message_id = 0
-        self._pending: Dict[int, asyncio.Future] = {}
+        self._pending: dict[int, asyncio.Future] = {}
         self._auth_event = asyncio.Event()
         self._core_api_url: str = ""  # discovered at runtime
 
@@ -102,9 +102,7 @@ class HAClient:
 
         # Step 3: If no proxy works, try getting an ingress session/token
         if not self._core_api_url:
-            logger.warning(
-                "Core API proxy not accessible - trying to create ingress token"
-            )
+            logger.warning("Core API proxy not accessible - trying to create ingress token")
             # Try getting a short-lived token from Supervisor
             token_resp = await self._supervisor_post("/auth/token", data=None)
             if token_resp:
@@ -121,9 +119,7 @@ class HAClient:
                             headers=headers,
                             timeout=aiohttp.ClientTimeout(total=3),
                         ) as resp:
-                            logger.info(
-                                f"Direct Core probe {url}/config: {resp.status}"
-                            )
+                            logger.info(f"Direct Core probe {url}/config: {resp.status}")
                             if resp.status == 200:
                                 self._core_api_url = url
                                 self.core_token = self.auth_token
@@ -153,7 +149,7 @@ class HAClient:
 
                 try:
                     await asyncio.wait_for(self._auth_event.wait(), timeout=10)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
 
                 if self.authenticated:
@@ -188,7 +184,7 @@ class HAClient:
 
     # --- Supervisor API (always works) ---
 
-    async def _supervisor_get(self, path: str) -> Optional[Dict]:
+    async def _supervisor_get(self, path: str) -> dict | None:
         """GET from Supervisor API (uses hassio_api role)."""
         try:
             async with aiohttp.ClientSession() as session:
@@ -205,7 +201,7 @@ class HAClient:
             logger.error(f"Supervisor GET {path}: {e}")
             return None
 
-    async def _supervisor_post(self, path: str, data: Optional[Dict]) -> Optional[Dict]:
+    async def _supervisor_post(self, path: str, data: dict | None) -> dict | None:
         """POST to Supervisor API."""
         try:
             async with aiohttp.ClientSession() as session:
@@ -229,7 +225,7 @@ class HAClient:
 
     # --- Core API (discovered at runtime) ---
 
-    async def _core_get(self, path: str) -> Optional[Any]:
+    async def _core_get(self, path: str) -> Any | None:
         """GET from HA Core API (using whichever method works)."""
         if not self._core_api_url:
             return None
@@ -257,9 +253,7 @@ class HAClient:
                     data = json.loads(msg.data)
                     msg_type = data.get("type")
                     if msg_type == "auth_required":
-                        logger.info(
-                            f"WS auth_required (HA {data.get('ha_version', '?')})"
-                        )
+                        logger.info(f"WS auth_required (HA {data.get('ha_version', '?')})")
                         await self._authenticate()
                     elif msg_type == "auth_ok":
                         self.authenticated = True
@@ -290,7 +284,7 @@ class HAClient:
                 }
             )
 
-    async def _send_ws(self, payload: dict) -> Optional[dict]:
+    async def _send_ws(self, payload: dict) -> dict | None:
         if not self.ws or not self.authenticated:
             return None
         self._message_id += 1
@@ -302,17 +296,17 @@ class HAClient:
         await self.ws.send_json(payload)
         try:
             return await asyncio.wait_for(future, timeout=10)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._pending.pop(mid, None)
             return None
 
     # --- State/Entity access ---
 
-    async def get_states(self) -> List[Dict]:
+    async def get_states(self) -> list[dict]:
         result = await self._core_get("/states")
         return result if isinstance(result, list) else []
 
-    async def get_config_entries(self) -> List[Dict]:
+    async def get_config_entries(self) -> list[dict]:
         # Try REST first, then WS
         result = await self._core_get("/config/config_entries/entry")
         if isinstance(result, list) and result:
@@ -325,7 +319,7 @@ class HAClient:
 
         return []
 
-    async def get_device_registry(self) -> List[Dict]:
+    async def get_device_registry(self) -> list[dict]:
         """Get HA device registry (has configuration_url with IP for network devices)."""
         if self.authenticated:
             resp = await self._send_ws({"type": "config/device_registry/list"})
@@ -335,7 +329,7 @@ class HAClient:
 
     # --- WLED Discovery ---
 
-    async def discover_wled_devices(self) -> List[Dict]:
+    async def discover_wled_devices(self) -> list[dict]:
         logger.info(
             f"Discovery (core_api={'OK' if self._core_api_url else 'NONE'}, "
             f"ws={self.authenticated})"
@@ -360,8 +354,8 @@ class HAClient:
         host = url.split("://")[-1].split("/")[0].split(":")[0]
         return host
 
-    async def _from_entries(self, wled_entries: List[Dict]) -> List[Dict]:
-        entries_map: Dict[str, Dict] = {}
+    async def _from_entries(self, wled_entries: list[dict]) -> list[dict]:
+        entries_map: dict[str, dict] = {}
         for e in wled_entries:
             eid = e.get("entry_id", "")
             host = e.get("data", {}).get("host", "")
@@ -369,14 +363,12 @@ class HAClient:
                 "host": host,
                 "title": e.get("title", ""),
             }
-            logger.info(
-                f"  Config entry: {e.get('title')} entry_id={eid} host={host or '?'}"
-            )
+            logger.info(f"  Config entry: {e.get('title')} entry_id={eid} host={host or '?'}")
 
         # Get device registry to find configuration_url (contains IP)
         dev_registry = await self.get_device_registry()
         # Map config_entry_id -> configuration_url
-        entry_ip_map: Dict[str, str] = {}
+        entry_ip_map: dict[str, str] = {}
         for dev in dev_registry:
             config_entries = dev.get("config_entries", [])
             config_url = dev.get("configuration_url", "") or ""
@@ -390,7 +382,7 @@ class HAClient:
                         )
 
         # Resolve entity IDs from entity registry
-        entity_map: Dict[str, str] = {}
+        entity_map: dict[str, str] = {}
         if self.authenticated:
             resp = await self._send_ws({"type": "config/entity_registry/list"})
             if resp and resp.get("success"):
@@ -403,18 +395,13 @@ class HAClient:
         states = await self.get_states()
         state_map = {s["entity_id"]: s for s in states}
 
-        devices: List[Dict] = []
+        devices: list[dict] = []
         for entry_id, info in entries_map.items():
             eid = entity_map.get(entry_id, "")
             state = state_map.get(eid, {})
             attrs = state.get("attributes", {})
             # IP priority: config entry data > device registry > entity attributes
-            ip = (
-                info["host"]
-                or entry_ip_map.get(entry_id, "")
-                or attrs.get("ip_address", "")
-                or ""
-            )
+            ip = info["host"] or entry_ip_map.get(entry_id, "") or attrs.get("ip_address", "") or ""
             devices.append(
                 {
                     "entity_id": eid,
@@ -424,17 +411,15 @@ class HAClient:
                     "attributes": attrs,
                 }
             )
-            logger.info(
-                f"  Result: {eid} name={attrs.get('friendly_name', info['title'])} ip={ip}"
-            )
+            logger.info(f"  Result: {eid} name={attrs.get('friendly_name', info['title'])} ip={ip}")
         logger.info(f"Config entries -> {len(devices)} devices")
         return devices
 
-    async def _from_states(self) -> List[Dict]:
+    async def _from_states(self) -> list[dict]:
         states = await self.get_states()
         logger.info(f"State scan: {len(states)} entities")
 
-        devices: List[Dict] = []
+        devices: list[dict] = []
         seen: set = set()
 
         for entity in states:
@@ -451,10 +436,7 @@ class HAClient:
                 is_wled = True
             elif isinstance(attrs.get("effect_list"), list):
                 effects = set(attrs["effect_list"])
-                if (
-                    len({"Solid", "Blink", "Breathe", "Rainbow", "Fire 2012"} & effects)
-                    >= 3
-                ):
+                if len({"Solid", "Blink", "Breathe", "Rainbow", "Fire 2012"} & effects) >= 3:
                     is_wled = True
 
             if is_wled and eid not in seen:
@@ -476,8 +458,8 @@ class HAClient:
 
     # --- Diagnostics ---
 
-    async def get_diagnostics(self) -> Dict[str, Any]:
-        diag: Dict[str, Any] = {
+    async def get_diagnostics(self) -> dict[str, Any]:
+        diag: dict[str, Any] = {
             "token_len": len(self.auth_token),
             "core_api_url": self._core_api_url or "NOT_FOUND",
             "ws_authenticated": self.authenticated,
@@ -544,8 +526,7 @@ class HAClient:
         if entries:
             wled = [e for e in entries if e.get("domain") == "wled"]
             diag["wled_entries"] = [
-                {"title": e.get("title"), "host": e.get("data", {}).get("host", "?")}
-                for e in wled
+                {"title": e.get("title"), "host": e.get("data", {}).get("host", "?")} for e in wled
             ]
         else:
             diag["wled_entries"] = []
@@ -554,9 +535,7 @@ class HAClient:
         diag["env"] = {
             "SUPERVISOR_TOKEN": bool(os.getenv("SUPERVISOR_TOKEN")),
             "HASSIO_TOKEN": bool(os.getenv("HASSIO_TOKEN")),
-            "s6_SUPERVISOR_TOKEN": Path(
-                "/run/s6/container_environment/SUPERVISOR_TOKEN"
-            ).exists(),
+            "s6_SUPERVISOR_TOKEN": Path("/run/s6/container_environment/SUPERVISOR_TOKEN").exists(),
         }
 
         return diag
@@ -578,7 +557,7 @@ class HAClient:
         except Exception as e:
             return {"type": "error", "message": str(e)}
 
-    async def _call_service(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _call_service(self, data: dict[str, Any]) -> dict[str, Any]:
         domain = data.get("domain")
         service = data.get("service")
         if not domain or not service:

@@ -11,6 +11,19 @@
 - Add the `io.hass.*` image labels
 - Migrate the Biome configuration to schema 2.x and fix the reported findings
 - Stop tracking `node_modules/`
+- Bump @ant-design/icons from 6.2.2 to 6.3.4
+- Bump typescript from 6.0.3 to 7.0.2 and remove the removed `baseUrl` option
+  from `tsconfig.json` (use `paths` with relative entries instead)
+- Bump @vitejs/plugin-react from 6.0.1 to 6.3.0
+- Bump react and @types/react from 19.2.5 to 19.3.1
+- Bump fastapi from 0.136.1 to 0.165.0
+- Bump pydantic from 2.13.3 to 2.14.4
+- Bump numpy from 1.26.2 to 2.5.5
+- Bump pyyaml from 6.0.1 to 6.0.4
+- Bump python-json-logger from 4.1.0 to 4.2.0
+- Modernize the Python type hints (`dict`/`list` instead of `typing.Dict`,
+  `X | None` instead of `Optional[X]`) and fix all Ruff findings
+- Remove unused imports and dead code in the frontend (Biome clean)
 
 ## 0.9.6
 

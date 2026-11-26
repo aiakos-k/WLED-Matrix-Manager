@@ -250,7 +250,7 @@ Common causes:
 ### Frontend shows 404
 
 - Check if `frontend/dist/index.html` exists (in the Docker image)
-- Vite must be built with `base: './'` (see TEMPLATE_GUIDE.md)
+- Vite must be built with `base: './'` (see `frontend/vite.config.ts`)
 
 ### WLED device unreachable
 
@@ -268,7 +268,8 @@ Details: [WLED_PROTOCOLS.md](./backend/docs/WLED_PROTOCOLS.md) — Section "Real
 
 ### Add-on not in sidebar
 
-`ingress_panel: true` must be set. In the central platform (`~/ha-development`):
+`ingress: true` must be set (together with `panel_icon` and `panel_title`).
+In the central platform (`~/ha-development`):
 ```bash
 bash scripts/ha-stack.sh apps rebuild local_wled_matrix_manager
 bash scripts/ha-stack.sh apps start   local_wled_matrix_manager

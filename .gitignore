@@ -22,3 +22,8 @@ build/
 
 # Claude Code
 .claude/settings.local.json
+
+# Devcontainer / Tooling
+.devcontainer/
+.devcontainer-lock.json
+.ruff_cache/

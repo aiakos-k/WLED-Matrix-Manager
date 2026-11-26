@@ -81,6 +81,9 @@ Details: [WLED_PROTOCOLS.md](./wled_matrix_manager/backend/docs/WLED_PROTOCOLS.m
 3. Install and start **WLED Matrix Manager**
 4. The add-on appears in the **sidebar**
 
+> There is no `image:` field in `config.yaml` on purpose — the Supervisor builds
+> the add-on **locally from the Dockerfile**, so changes are picked up directly.
+
 ### Developer Setup
 
 See [QUICKSTART.md](./QUICKSTART.md) for the setup in the central `ha-development` platform.
@@ -127,7 +130,7 @@ Swagger Docs: `http://<host>:8000/docs`
 - **Pillow / NumPy** — Image processing
 
 ### Frontend
-- **React 18** / **TypeScript** / **Vite**
+- **React 19** / **TypeScript 7** / **Vite 8**
 - **Ant Design** — UI components
 - **React Router** — SPA navigation
 
@@ -145,7 +148,7 @@ Swagger Docs: `http://<host>:8000/docs`
 ## Documentation
 
 - [QUICKSTART.md](./QUICKSTART.md) — Setup & first steps (central `ha-development` platform)
-- [TEMPLATE_GUIDE.md](./TEMPLATE_GUIDE.md) — Ingress routing & build architecture
+- [wled_matrix_manager/CHANGELOG.md](./wled_matrix_manager/CHANGELOG.md) — Release notes
 - [WLED_PROTOCOLS.md](./wled_matrix_manager/backend/docs/WLED_PROTOCOLS.md) — WLED protocol reference (JSON API, UDP DNRGB, Realtime Mode)
 - [DOCS.md](./wled_matrix_manager/DOCS.md) — Detailed add-on documentation
 

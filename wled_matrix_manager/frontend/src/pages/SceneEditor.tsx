@@ -38,9 +38,7 @@ import {
   type FrameData,
   getDevices,
   getScene,
-  playScene,
   type SceneCreate,
-  stopScene,
   testFrameOnDevice,
   updateScene,
 } from "@/api/client";
@@ -201,20 +199,6 @@ const SceneEditor: React.FC = () => {
     [currentFrame, width, height]
   );
 
-  const removePixel = useCallback(
-    (index: number) => {
-      setFrames((prev) => {
-        const next = [...prev];
-        const frame = { ...next[currentFrame] };
-        const pixels = (frame.pixel_data?.pixels || []).filter((p) => p.index !== index);
-        frame.pixel_data = { pixels, width, height };
-        next[currentFrame] = frame;
-        return next;
-      });
-    },
-    [currentFrame, width, height]
-  );
-
   // ─── Canvas drawing ─────────────────────────────────────
 
   const drawCanvas = useCallback(() => {
@@ -273,7 +257,8 @@ const SceneEditor: React.FC = () => {
   // ─── Mouse handlers ─────────────────────────────────────
 
   const getPixelIndex = (e: React.MouseEvent<HTMLCanvasElement>): number => {
-    const canvas = canvasRef.current!;
+    const canvas = canvasRef.current;
+    if (!canvas) return -1;
     const rect = canvas.getBoundingClientRect();
     const cellSize = canvas.width / width;
     const x = Math.floor(((e.clientX - rect.left) * (canvas.width / rect.width)) / cellSize);
@@ -493,11 +478,12 @@ const SceneEditor: React.FC = () => {
 
   const handleImageUpload = (file: File) => {
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = () => {
       const img = new Image();
+      const dataUrl = reader.result as string;
       img.onload = () => {
         setUploadedImage({
-          src: ev.target!.result as string,
+          src: dataUrl,
           width: img.width,
           height: img.height,
         });
@@ -513,7 +499,7 @@ const SceneEditor: React.FC = () => {
         setPreviewPixels(null);
         setShowImageModal(true);
       };
-      img.src = ev.target!.result as string;
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
     return false;
@@ -572,7 +558,6 @@ const SceneEditor: React.FC = () => {
     if (!makeTransparent || !previewPixels || !previewCanvasRef.current) return;
     const canvas = previewCanvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const scaleFactor = 15;
     const px = Math.floor((e.clientX - rect.left) / (rect.width / width));
     const py = Math.floor((e.clientY - rect.top) / (rect.height / height));
     if (px >= 0 && px < width && py >= 0 && py < height) {

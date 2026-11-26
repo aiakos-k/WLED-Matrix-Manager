@@ -5,6 +5,7 @@
 - Docker (als Host-Runtime)
 - Git
 - VS Code (optional — die Toolchain steckt im zentralen DevContainer)
+- Für die lokale Entwicklung ohne Container: **Python 3.11+** und **Node.js 20+**
 
 ---
 
@@ -100,12 +101,31 @@ python main.py
 
 # Frontend (Terminal 2)
 cd wled_matrix_manager/frontend
-npm install
+npm ci          # Lockfile ist eingecheckt — wie im Dockerfile
 npm run dev
 ```
 
 Frontend: http://localhost:3000
 Backend: http://localhost:8000/docs
+
+Für einen Produktions-Build: `npm run build` — das Ergebnis landet in
+`frontend/dist/` und wird vom Backend ausgeliefert.
+
+---
+
+## Release
+
+Ein Release ist ein reiner Versions-Bump, keine Logikänderung. Commit-Message:
+`Release <X.Y.Z>`.
+
+1. `wled_matrix_manager/CHANGELOG.md` — neuen Abschnitt `## <X.Y.Z>` ganz oben
+   (direkt unter der Kommentarzeile) mit den Änderungen als Bullet-Liste
+2. `wled_matrix_manager/config.yaml` — Feld `version: "<X.Y.Z>"`
+
+Weitere Infos zu Abhängigkeits-Updates: `wled_matrix_manager/backend/requirements.txt`
+(Pins mit `==`) und `wled_matrix_manager/frontend/package.json` + `package-lock.json`.
+Nach npm-/pip-Updates immer `npm ci` bzw. Build erneut ausführen, da Major-Sprünge
+(etwa TypeScript 7) Konfigurationsänderungen erfordern können.
 
 ---
 

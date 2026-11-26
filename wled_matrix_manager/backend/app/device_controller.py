@@ -6,7 +6,6 @@ Supports HTTP JSON API and UDP DNRGB protocols.
 import logging
 import socket
 import time
-from typing import Dict
 
 import aiohttp
 
@@ -26,7 +25,7 @@ class DeviceController:
 
     @staticmethod
     async def send_json_command(
-        device_ip: str, command: Dict, timeout: int = DEFAULT_TIMEOUT
+        device_ip: str, command: dict, timeout: int = DEFAULT_TIMEOUT
     ) -> bool:
         """Send a command via WLED HTTP JSON API."""
         try:
@@ -48,9 +47,7 @@ class DeviceController:
         try:
             url = f"http://{device_ip}/json/info"
             async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    url, timeout=aiohttp.ClientTimeout(total=timeout)
-                ) as resp:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
                     resp.raise_for_status()
                     return True
         except Exception:
@@ -78,13 +75,13 @@ class DeviceController:
 
     @staticmethod
     def generate_wled_command(
-        pixel_data: Dict,
+        pixel_data: dict,
         brightness: int = 128,
         on: bool = True,
         color_r: int = 100,
         color_g: int = 100,
         color_b: int = 100,
-    ) -> Dict:
+    ) -> dict:
         """
         Generate a WLED JSON API command from pixel data.
         Uses indexed pixel format with range compression.
@@ -114,9 +111,7 @@ class DeviceController:
                     == sorted_pixels[end_i].get("index", 0) + 1
                 ):
                     next_color = sorted_pixels[end_i + 1].get("color", [0, 0, 0])
-                    next_adjusted = [
-                        int(next_color[c] * color_multipliers[c]) for c in range(3)
-                    ]
+                    next_adjusted = [int(next_color[c] * color_multipliers[c]) for c in range(3)]
                     if next_adjusted == adjusted:
                         end_i += 1
                     else:
@@ -143,7 +138,7 @@ class DeviceController:
     @staticmethod
     def send_udp_dnrgb(
         device_ip: str,
-        pixel_data: Dict,
+        pixel_data: dict,
         brightness: int = 128,
         timeout: int = UDP_TIMEOUT,
         frame_duration: float = None,
@@ -169,9 +164,7 @@ class DeviceController:
                 idx = pixel.get("index", 0)
                 color = pixel.get("color", [0, 0, 0])
                 if 0 <= idx < total_leds:
-                    perceived = int(
-                        0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2]
-                    )
+                    perceived = int(0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2])
                     if perceived < 50:
                         factor = brightness_factor
                     elif perceived < 150:
@@ -182,20 +175,18 @@ class DeviceController:
                     else:
                         factor = min(1.0, brightness_factor**0.5)
 
-                    adjusted = [
-                        int(color[c] * factor * color_multipliers[c]) for c in range(3)
-                    ]
+                    adjusted = [int(color[c] * factor * color_multipliers[c]) for c in range(3)]
                     pixel_by_idx[idx] = adjusted
 
-            MAX_LEDS_PER_PACKET = 458
+            max_leds_per_packet = 458
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(timeout)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)
             time.sleep(0.010)
 
             try:
-                for start_idx in range(0, total_leds, MAX_LEDS_PER_PACKET):
-                    end_idx = min(start_idx + MAX_LEDS_PER_PACKET, total_leds)
+                for start_idx in range(0, total_leds, max_leds_per_packet):
+                    end_idx = min(start_idx + max_leds_per_packet, total_leds)
                     packet = bytearray()
                     packet.append(4)  # Protocol: DNRGB
 
@@ -215,9 +206,7 @@ class DeviceController:
                             packet.extend([0, 0, 0])
 
                     if len(packet) > 4:
-                        sock.sendto(
-                            bytes(packet), (device_ip, DeviceController.UDP_PORT)
-                        )
+                        sock.sendto(bytes(packet), (device_ip, DeviceController.UDP_PORT))
                         time.sleep(0.010)
             finally:
                 sock.close()

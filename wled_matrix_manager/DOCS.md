@@ -221,7 +221,7 @@ Endpoint: `/ws`
 - **homeassistant_api** — WebSocket communication with HA Core
 - **hassio_api (admin)** — Supervisor access
 - **Network (Port 8000)** — Frontend & API
-- **share:rw, addon_config:rw** — Data persistence
+- **share:rw, app_config:rw** — Data persistence
 
 ### WLED Device Settings
 
@@ -250,7 +250,7 @@ Common causes:
 ### Frontend shows 404
 
 - Check if `frontend/dist/index.html` exists (in the Docker image)
-- Vite must be built with `base: './'` (see TEMPLATE_GUIDE.md)
+- Vite must be built with `base: './'` (see `frontend/vite.config.ts`)
 
 ### WLED device unreachable
 
@@ -268,15 +268,16 @@ Details: [WLED_PROTOCOLS.md](./backend/docs/WLED_PROTOCOLS.md) — Section "Real
 
 ### Add-on not in sidebar
 
-`ingress_panel: true` must be set. In DevContainer:
+`ingress: true` must be set (together with `panel_icon` and `panel_title`).
+In the central platform (`~/ha-development`):
 ```bash
-ha apps rebuild --force local_wled_matrix_manager
-ha apps start local_wled_matrix_manager
+bash scripts/ha-stack.sh apps rebuild local_wled_matrix_manager
+bash scripts/ha-stack.sh apps start   local_wled_matrix_manager
 ```
 
 ### WebSocket connection failed
 
-- In DevContainer: WebSocket runs on the `supervisor` hostname, not `localhost`
+- In the add-on container: WebSocket runs on the `supervisor` hostname, not `localhost`
 - Browser DevTools → Network → WS tab for errors
 
 ---

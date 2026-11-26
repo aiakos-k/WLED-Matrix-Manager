@@ -21,6 +21,9 @@ if [ -n "$STAGED_PY" ]; then
       exit 1
     }
   fi
+  # Use a user-writable cache dir (the repo-local .ruff_cache may be owned by root)
+  RUFF_CACHE_DIR="${RUFF_CACHE_DIR:-$HOME/.cache/ruff}"
+  export RUFF_CACHE_DIR
   echo "$STAGED_PY" | xargs ruff check --fix || exit 1
   echo "$STAGED_PY" | xargs ruff format || exit 1
   echo "$STAGED_PY" | xargs git add

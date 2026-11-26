@@ -2,30 +2,32 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Start Home Assistant",
+      "label": "HA-Stack starten (zentral)",
       "type": "shell",
-      "command": "supervisor_run",
-      "group": {
-        "kind": "test",
-        "isDefault": true
-      },
+      "command": "bash ../../scripts/ha-stack.sh up",
       "presentation": {
         "reveal": "always",
-        "panel": "new"
+        "panel": "shared"
       },
       "problemMatcher": []
     },
     {
-      "label": "Start Addon",
+      "label": "Add-on installieren (zentral)",
       "type": "shell",
-      "command": "ha addons stop \"local_${input:addonName}\"; ha addons start \"local_${input:addonName}\"; docker logs --follow \"addon_local_${input:addonName}\"",
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      },
+      "command": "bash ../../scripts/ha-stack.sh apps install local_${input:appName}",
       "presentation": {
         "reveal": "always",
-        "panel": "new"
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Add-on neu bauen und starten (zentral)",
+      "type": "shell",
+      "command": "bash ../../scripts/ha-stack.sh apps rebuild local_${input:appName} && bash ../../scripts/ha-stack.sh apps start local_${input:appName}",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
       },
       "problemMatcher": [],
       "runOptions": {
@@ -33,38 +35,37 @@
       }
     },
     {
-      "label": "Rebuild and Start Addon",
+      "label": "Add-on-Logs (zentral)",
       "type": "shell",
-      "command": "ha addons rebuild --force \"local_${input:addonName}\"; ha addons start \"local_${input:addonName}\"; docker logs --follow \"addon_local_${input:addonName}\"",
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      },
+      "command": "bash ../../scripts/ha-stack.sh logs local_${input:appName}",
       "presentation": {
         "reveal": "always",
-        "panel": "new"
+        "panel": "shared"
       },
       "problemMatcher": []
     },
     {
-      "label": "Install Dependencies",
+      "label": "Backend: venv anlegen",
       "type": "shell",
-      "command": "bash devcontainer_bootstrap",
-      "detail": "Creates the backend venv (uv) and installs frontend dependencies (npm ci)",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Run Backend (dev)",
-      "type": "shell",
-      "command": "wled_matrix_manager/backend/venv/bin/python -m uvicorn main:app --reload --port 8000",
+      "command": "python3 -m venv venv && ./venv/bin/pip install -r requirements.txt -r requirements-dev.txt",
       "options": {
         "cwd": "${workspaceFolder}/wled_matrix_manager/backend"
       },
-      "detail": "FastAPI on http://localhost:8000/docs",
+      "detail": "Erstellt wled_matrix_manager/backend/venv mit den gepinnten Abhängigkeiten",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: Server starten (dev)",
+      "type": "shell",
+      "command": "./venv/bin/python -m uvicorn main:app --reload --port 8000",
+      "options": {
+        "cwd": "${workspaceFolder}/wled_matrix_manager/backend"
+      },
+      "detail": "FastAPI auf http://localhost:8000/docs",
       "presentation": {
         "reveal": "always",
         "panel": "new"
@@ -79,13 +80,52 @@
       }
     },
     {
-      "label": "Run Frontend (dev)",
+      "label": "Backend: Lint (ruff)",
+      "type": "shell",
+      "command": "./venv/bin/python -m ruff check .",
+      "options": {
+        "cwd": "${workspaceFolder}/wled_matrix_manager/backend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: Format (ruff)",
+      "type": "shell",
+      "command": "./venv/bin/python -m ruff format .",
+      "options": {
+        "cwd": "${workspaceFolder}/wled_matrix_manager/backend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: Dependencies (npm ci)",
+      "type": "shell",
+      "command": "npm ci",
+      "options": {
+        "cwd": "${workspaceFolder}/wled_matrix_manager/frontend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: Dev-Server",
       "type": "shell",
       "command": "npm run dev",
       "options": {
         "cwd": "${workspaceFolder}/wled_matrix_manager/frontend"
       },
-      "detail": "Vite dev server on http://localhost:3000",
+      "detail": "Vite auf http://localhost:3000",
       "isBackground": true,
       "presentation": {
         "reveal": "always",
@@ -101,33 +141,7 @@
       }
     },
     {
-      "label": "Lint Backend (ruff)",
-      "type": "shell",
-      "command": "wled_matrix_manager/backend/venv/bin/python -m ruff check .",
-      "options": {
-        "cwd": "${workspaceFolder}/wled_matrix_manager/backend"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Format Backend (ruff)",
-      "type": "shell",
-      "command": "wled_matrix_manager/backend/venv/bin/python -m ruff format .",
-      "options": {
-        "cwd": "${workspaceFolder}/wled_matrix_manager/backend"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Lint Frontend (biome)",
+      "label": "Frontend: Lint (biome)",
       "type": "shell",
       "command": "npm run lint",
       "options": {
@@ -140,7 +154,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Type-check Frontend (tsc)",
+      "label": "Frontend: Type-Check (tsc)",
       "type": "shell",
       "command": "npm run type-check",
       "options": {
@@ -153,7 +167,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Build Frontend",
+      "label": "Frontend: Build",
       "type": "shell",
       "command": "npm run build",
       "options": {
@@ -164,27 +178,15 @@
         "panel": "shared"
       },
       "problemMatcher": []
-    },
-    {
-      "label": "Build Add-on Image (docker)",
-      "type": "shell",
-      "command": "docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.20 --build-arg TEMPIO_VERSION=2024.11.2 --build-arg BUILD_ARCH=amd64 -t local_wled_matrix_manager:dev wled_matrix_manager/",
-      "detail": "Builds the add-on image locally without the Supervisor",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "problemMatcher": []
     }
   ],
   "inputs": [
     {
-      "id": "addonName",
+      "id": "appName",
       "type": "pickString",
-      "description": "Name of addon (to add your addon to this list, please edit .vscode/tasks.json)",
+      "description": "Add-on (Slug ohne 'local_')",
       "options": [
-        "wled_matrix_manager",
-        "example"
+        "wled_matrix_manager"
       ]
     }
   ]

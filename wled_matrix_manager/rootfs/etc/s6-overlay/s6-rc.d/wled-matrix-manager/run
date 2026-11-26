@@ -1,9 +1,10 @@
-#!/usr/bin/with-contenv bashio
+#!/command/with-contenv bashio
+# shellcheck shell=bash
 # ==============================================================================
-# Home Assistant Add-on Service Start
+# Home Assistant Add-on: WLED Matrix Manager
 # ==============================================================================
 # FastAPI backend server that communicates with Home Assistant
-# https://developers.home-assistant.io/docs/add-ons/
+# https://contributors.home-assistant.io/apps/
 # ==============================================================================
 
 # Declare variables

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 // Always compute WS URL from the current location so it works
 // both in HA ingress (/api/hassio_ingress/TOKEN/ws) and local dev.

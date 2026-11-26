@@ -10,13 +10,14 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
+
 from app.database import init_db
 from app.ha_client import get_ha_client
 from app.ha_entity_sync import get_entity_sync
 from app.router import router
 from app.scene_playback import get_all_playback_status
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.staticfiles import StaticFiles
 
 logging.basicConfig(
     level=logging.INFO,

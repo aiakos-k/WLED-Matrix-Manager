@@ -5,7 +5,7 @@ React TypeScript frontend for the WLED Matrix Manager.
 ## Development
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -23,8 +23,8 @@ The build output in `dist/` is served by the backend as static files.
 
 ## Technologies
 
-- **React 18** + **TypeScript**
-- **Vite** — Build tool
+- **React 19** + **TypeScript 7**
+- **Vite 8** — Build tool
 - **Ant Design** — UI components
 - **React Router** — SPA navigation
 

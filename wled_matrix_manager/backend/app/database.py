@@ -37,12 +37,11 @@ async def init_db():
     async with engine.begin() as conn:
         for table, column, col_type in migrations:
             try:
-                await conn.execute(
-                    text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
-                )
+                await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
                 logger.info(f"Migration: added {table}.{column}")
-            except Exception:
-                pass  # Column already exists
+            except Exception as e:
+                # Column already exists
+                logger.debug(f"Migration skipped for {table}.{column}: {e}")
 
 
 async def get_session() -> AsyncSession:

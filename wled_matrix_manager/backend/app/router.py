@@ -3,7 +3,6 @@ API Router — scenes, devices, playback, import/export, image upload
 """
 
 import logging
-from typing import List
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
@@ -45,17 +44,15 @@ router = APIRouter(prefix="/api", tags=["api"])
 
 @router.get("/status", response_model=Status)
 async def get_status():
-    return Status(
-        status="running", version="0.9.0", message="WLED Matrix Manager is running"
-    )
+    return Status(status="running", version="0.9.0", message="WLED Matrix Manager is running")
 
 
 # ─── Devices ─────────────────────────────────────────────────────
 
 
-@router.get("/devices", response_model=List[DeviceResponse])
+@router.get("/devices", response_model=list[DeviceResponse])
 async def list_devices(db: AsyncSession = Depends(get_session)):
-    result = await db.execute(select(Device).where(Device.is_active == True))
+    result = await db.execute(select(Device).where(Device.is_active))
     devices = result.scalars().all()
     return [DeviceResponse.model_validate(d) for d in devices]
 
@@ -127,11 +124,11 @@ async def ha_debug():
 # ─── Scenes ──────────────────────────────────────────────────────
 
 
-@router.get("/scenes", response_model=List[SceneResponse])
+@router.get("/scenes", response_model=list[SceneResponse])
 async def list_scenes(db: AsyncSession = Depends(get_session)):
     result = await db.execute(
         select(Scene)
-        .where(Scene.is_active == True)
+        .where(Scene.is_active)
         .options(selectinload(Scene.frames), selectinload(Scene.devices))
     )
     scenes = result.scalars().all()
@@ -233,9 +230,7 @@ async def create_scene(data: SceneCreate, db: AsyncSession = Depends(get_session
     if data.device_ids:
         for did in data.device_ids:
             await db.execute(
-                scene_device_association.insert().values(
-                    scene_id=scene.id, device_id=did
-                )
+                scene_device_association.insert().values(scene_id=scene.id, device_id=did)
             )
 
     await db.commit()
@@ -282,9 +277,7 @@ async def create_scene(data: SceneCreate, db: AsyncSession = Depends(get_session
 
 
 @router.put("/scenes/{scene_id}", response_model=SceneResponse)
-async def update_scene(
-    scene_id: int, data: SceneUpdate, db: AsyncSession = Depends(get_session)
-):
+async def update_scene(scene_id: int, data: SceneUpdate, db: AsyncSession = Depends(get_session)):
     result = await db.execute(
         select(Scene)
         .where(Scene.id == scene_id)
@@ -394,9 +387,7 @@ async def delete_scene(scene_id: int, db: AsyncSession = Depends(get_session)):
 
 
 @router.post("/scenes/{scene_id}/play")
-async def play_scene(
-    scene_id: int, req: PlaybackRequest, db: AsyncSession = Depends(get_session)
-):
+async def play_scene(scene_id: int, req: PlaybackRequest, db: AsyncSession = Depends(get_session)):
     result = await db.execute(
         select(Scene)
         .where(Scene.id == scene_id)
@@ -560,14 +551,12 @@ async def export_scene(scene_id: int, db: AsyncSession = Depends(get_session)):
 
 
 @router.post("/scenes/import")
-async def import_scene(
-    file: UploadFile = File(...), db: AsyncSession = Depends(get_session)
-):
+async def import_scene(file: UploadFile = File(...), db: AsyncSession = Depends(get_session)):
     content = await file.read()
     try:
         scene_dict = binary_to_scene(content)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
     scene = Scene(
         name=scene_dict["name"],
@@ -629,7 +618,7 @@ async def convert_image(
         pixel_data = ImageToPixelConverter.convert_bytes(content, width, height, colors)
         return pixel_data
     except Exception as e:
-        raise HTTPException(400, f"Image conversion failed: {e}")
+        raise HTTPException(400, f"Image conversion failed: {e}") from e
 
 
 # ─── Stats ───────────────────────────────────────────────────────
@@ -637,8 +626,8 @@ async def convert_image(
 
 @router.get("/stats")
 async def get_stats(db: AsyncSession = Depends(get_session)):
-    scenes_result = await db.execute(select(Scene).where(Scene.is_active == True))
-    devices_result = await db.execute(select(Device).where(Device.is_active == True))
+    scenes_result = await db.execute(select(Scene).where(Scene.is_active))
+    devices_result = await db.execute(select(Device).where(Device.is_active))
     scenes = scenes_result.scalars().all()
     devices = devices_result.scalars().all()
     playbacks = get_all_playback_status()

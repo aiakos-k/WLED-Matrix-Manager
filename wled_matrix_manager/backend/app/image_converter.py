@@ -3,15 +3,13 @@ Image to LED pixel data converter.
 Resizes images to matrix dimensions with optional color quantization.
 """
 
-from typing import Dict
-
 import numpy as np
 from PIL import Image
 
 
 class ImageToPixelConverter:
     @staticmethod
-    def convert(image_path: str, width: int, height: int, colors: int = 256) -> Dict:
+    def convert(image_path: str, width: int, height: int, colors: int = 256) -> dict:
         """Convert an image file to LED pixel data."""
         img = Image.open(image_path).convert("RGB")
         img = img.resize((width, height), Image.Resampling.LANCZOS)
@@ -31,9 +29,7 @@ class ImageToPixelConverter:
         return {"pixels": pixels, "width": width, "height": height}
 
     @staticmethod
-    def convert_bytes(
-        image_bytes: bytes, width: int, height: int, colors: int = 256
-    ) -> Dict:
+    def convert_bytes(image_bytes: bytes, width: int, height: int, colors: int = 256) -> dict:
         """Convert image bytes to LED pixel data."""
         from io import BytesIO
 

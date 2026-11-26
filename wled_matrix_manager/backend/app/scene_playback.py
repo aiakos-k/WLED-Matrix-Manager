@@ -7,11 +7,10 @@ import asyncio
 import logging
 import threading
 import time
-from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-active_playbacks: Dict[int, "ScenePlayback"] = {}
+active_playbacks: dict[int, "ScenePlayback"] = {}
 playback_lock = threading.Lock()
 
 
@@ -94,15 +93,13 @@ def upscale_pixel_data(
 class ScenePlayback:
     """Manages threaded playback of a scene on devices"""
 
-    def __init__(
-        self, scene_id: int, devices_info: list, frames: list, loop_mode: str = "once"
-    ):
+    def __init__(self, scene_id: int, devices_info: list, frames: list, loop_mode: str = "once"):
         self.scene_id = scene_id
         self.devices_info = devices_info
         self.frames = frames
         self.loop_mode = loop_mode
         self.is_running = False
-        self.thread: Optional[threading.Thread] = None
+        self.thread: threading.Thread | None = None
 
     def start(self):
         if self.is_running:
@@ -110,9 +107,7 @@ class ScenePlayback:
         self.is_running = True
         self.thread = threading.Thread(target=self._playback_loop, daemon=True)
         self.thread.start()
-        logger.info(
-            f"Started playback: scene {self.scene_id} on {len(self.devices_info)} devices"
-        )
+        logger.info(f"Started playback: scene {self.scene_id} on {len(self.devices_info)} devices")
 
     def stop(self):
         self.is_running = False
@@ -173,9 +168,7 @@ class ScenePlayback:
                         dh = device.get("matrix_height", 16)
                         scale_mode = device.get("scale_mode", "stretch")
 
-                        upscaled = upscale_pixel_data(
-                            pixel_data, dw, dh, mode=scale_mode
-                        )
+                        upscaled = upscale_pixel_data(pixel_data, dw, dh, mode=scale_mode)
 
                         try:
                             if protocol == "udp_dnrgb":
@@ -200,9 +193,7 @@ class ScenePlayback:
                                     color_b=color_b,
                                 )
                                 loop = asyncio.new_event_loop()
-                                loop.run_until_complete(
-                                    DeviceController.send_json_command(ip, cmd)
-                                )
+                                loop.run_until_complete(DeviceController.send_json_command(ip, cmd))
                                 loop.close()
                         except Exception as e:
                             logger.error(f"Error sending to {ip}: {e}")
@@ -222,8 +213,8 @@ class ScenePlayback:
                     loop = asyncio.new_event_loop()
                     loop.run_until_complete(DeviceController.turn_off(ip))
                     loop.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to turn off device {ip}: {e}")
             # Update HA entity state to "off"
             try:
                 from app.ha_entity_sync import get_entity_sync
@@ -239,9 +230,7 @@ class ScenePlayback:
                 active_playbacks.pop(self.scene_id, None)
 
 
-def start_scene_playback(
-    scene_id: int, devices_info: list, frames: list, loop_mode: str = "once"
-):
+def start_scene_playback(scene_id: int, devices_info: list, frames: list, loop_mode: str = "once"):
     target_ips = {d.get("ip_address") for d in devices_info}
 
     with playback_lock:

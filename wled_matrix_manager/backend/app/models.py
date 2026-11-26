@@ -3,7 +3,6 @@ SQLAlchemy models and Pydantic schemas for WLED Matrix Manager
 """
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel
 from sqlalchemy import (
@@ -53,9 +52,7 @@ class Device(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    scenes = relationship(
-        "Scene", secondary=scene_device_association, back_populates="devices"
-    )
+    scenes = relationship("Scene", secondary=scene_device_association, back_populates="devices")
 
 
 class Scene(Base):
@@ -78,9 +75,7 @@ class Scene(Base):
         cascade="all, delete-orphan",
         order_by="Frame.frame_index",
     )
-    devices = relationship(
-        "Device", secondary=scene_device_association, back_populates="scenes"
-    )
+    devices = relationship("Device", secondary=scene_device_association, back_populates="scenes")
 
 
 class Frame(Base):
@@ -119,7 +114,7 @@ class HAEntity(BaseModel):
 class DeviceCreate(BaseModel):
     name: str
     ip_address: str
-    ha_entity_id: Optional[str] = None
+    ha_entity_id: str | None = None
     matrix_width: int = 16
     matrix_height: int = 16
     communication_protocol: str = "udp_dnrgb"
@@ -129,22 +124,22 @@ class DeviceCreate(BaseModel):
 
 
 class DeviceUpdate(BaseModel):
-    name: Optional[str] = None
-    ip_address: Optional[str] = None
-    ha_entity_id: Optional[str] = None
-    matrix_width: Optional[int] = None
-    matrix_height: Optional[int] = None
-    communication_protocol: Optional[str] = None
-    chain_count: Optional[int] = None
-    segment_id: Optional[int] = None
-    scale_mode: Optional[str] = None
+    name: str | None = None
+    ip_address: str | None = None
+    ha_entity_id: str | None = None
+    matrix_width: int | None = None
+    matrix_height: int | None = None
+    communication_protocol: str | None = None
+    chain_count: int | None = None
+    segment_id: int | None = None
+    scale_mode: str | None = None
 
 
 class DeviceResponse(BaseModel):
     id: int
     name: str
     ip_address: str
-    ha_entity_id: Optional[str] = None
+    ha_entity_id: str | None = None
     matrix_width: int
     matrix_height: int
     communication_protocol: str
@@ -152,7 +147,7 @@ class DeviceResponse(BaseModel):
     segment_id: int
     scale_mode: str = "stretch"
     is_active: bool
-    is_healthy: Optional[bool] = None
+    is_healthy: bool | None = None
 
     class Config:
         from_attributes = True
@@ -161,7 +156,7 @@ class DeviceResponse(BaseModel):
 class FrameData(BaseModel):
     frame_index: int
     pixel_data: dict
-    duration: Optional[float] = None
+    duration: float | None = None
     brightness: int = 255
     color_r: int = 100
     color_g: int = 100
@@ -170,7 +165,7 @@ class FrameData(BaseModel):
 
 class SceneCreate(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     matrix_width: int = 16
     matrix_height: int = 16
     default_frame_duration: float = 1.0
@@ -180,20 +175,20 @@ class SceneCreate(BaseModel):
 
 
 class SceneUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    matrix_width: Optional[int] = None
-    matrix_height: Optional[int] = None
-    default_frame_duration: Optional[float] = None
-    loop_mode: Optional[str] = None
-    device_ids: Optional[list[int]] = None
-    frames: Optional[list[FrameData]] = None
+    name: str | None = None
+    description: str | None = None
+    matrix_width: int | None = None
+    matrix_height: int | None = None
+    default_frame_duration: float | None = None
+    loop_mode: str | None = None
+    device_ids: list[int] | None = None
+    frames: list[FrameData] | None = None
 
 
 class SceneResponse(BaseModel):
     id: int
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     matrix_width: int
     matrix_height: int
     default_frame_duration: float

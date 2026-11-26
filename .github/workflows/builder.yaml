@@ -92,6 +92,30 @@ jobs:
         with:
           path: "./${{ matrix.addon }}"
 
+      - name: Normalize add-on metadata
+        id: meta
+        shell: bash
+        env:
+          RAW_VERSION: ${{ steps.info.outputs.version }}
+          RAW_NAME: ${{ steps.info.outputs.name }}
+          RAW_DESCRIPTION: ${{ steps.info.outputs.description }}
+        run: |
+          # The info helper returns the raw values from config.yaml, including
+          # the surrounding quotes. They must be removed for image tags and labels.
+          strip() {
+            local value="$1"
+            value="${value//\"/}"
+            value="${value//\'/}"
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            echo "${value}"
+          }
+          {
+            echo "version=$(strip "${RAW_VERSION}")"
+            echo "name=$(strip "${RAW_NAME}")"
+            echo "description=$(strip "${RAW_DESCRIPTION}")"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Determine image names
         id: names
         env:
@@ -115,15 +139,19 @@ jobs:
           context: "./${{ matrix.addon }}"
           image: ${{ steps.names.outputs.arch_image }}
           image-tags: |
-            ${{ steps.info.outputs.version }}
+            ${{ steps.meta.outputs.version }}
+          cache-image-tag: ${{ steps.meta.outputs.version }}
+          # The images are not signed with Cosign – the cache image verification
+          # would only fail with "no signatures found" on every run.
+          cosign: false
           labels: |
             io.hass.type=addon
-            io.hass.name=${{ steps.info.outputs.name }}
-            io.hass.description=${{ steps.info.outputs.description }}
-            io.hass.version=${{ steps.info.outputs.version }}
+            io.hass.name=${{ steps.meta.outputs.name }}
+            io.hass.description=${{ steps.meta.outputs.description }}
+            io.hass.version=${{ steps.meta.outputs.version }}
             io.hass.arch=${{ matrix.arch }}
           push: ${{ github.event_name == 'push' }}
-          version: ${{ steps.info.outputs.version }}
+          version: ${{ steps.meta.outputs.version }}
 
   manifest:
     name: Publish multi-arch manifest
@@ -148,6 +176,20 @@ jobs:
         with:
           path: "./${{ matrix.addon }}"
 
+      - name: Normalize add-on metadata
+        id: meta
+        shell: bash
+        env:
+          RAW_VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          # The info helper returns the raw value from config.yaml, including the
+          # surrounding quotes. It must be removed for the image tags.
+          value="${RAW_VERSION//\"/}"
+          value="${value//\'/}"
+          value="${value#"${value%%[![:space:]]*}"}"
+          value="${value%"${value##*[![:space:]]}"}"
+          echo "version=${value}" >> "$GITHUB_OUTPUT"
+
       - name: Determine image names
         id: names
         env:
@@ -169,6 +211,7 @@ jobs:
           container-registry-password: ${{ secrets.GITHUB_TOKEN }}
           image-name: ${{ steps.names.outputs.image_name }}
           image-tags: |
-            ${{ steps.info.outputs.version }}
+            ${{ steps.meta.outputs.version }}
             latest
+          cosign: false
           registry-prefix: ${{ steps.names.outputs.registry_prefix }}

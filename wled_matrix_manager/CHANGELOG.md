@@ -1,4 +1,19 @@
 <!-- https://contributors.home-assistant.io/apps/reference/#keeping-a-changelog -->
+## 0.10.2
+
+- Fix the broken user interface after an add-on update: `index.html` is now
+  served with `no-cache, no-store, must-revalidate`. The browser cached the
+  HTML of the previous release heuristically and requested the asset files of
+  the old release, which no longer exist (`404 Not Found` for
+  `/assets/index-<hash>.js`).
+- Serve the hashed asset files with `public, max-age=31536000, immutable`
+- Serve `index.html` for unknown paths without a file extension, so that
+  client-side routes (e.g. `/scenes/42/edit`) survive a page reload
+- Publish the CI images into a single GHCR package
+  (`ghcr.io/aiakos-k/addon-wled-matrix-manager`): the per-architecture images
+  as `<version>-<arch>`, the multi-architecture manifest as `<version>` and
+  `latest`
+
 ## 0.10.1
 
 - Bump @ant-design/icons from 6.2.2 to 6.3.4

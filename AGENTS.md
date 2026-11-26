@@ -115,9 +115,16 @@ has its own, separate version which is deliberately **not** touched for add-on r
   locally from the Dockerfile. The CI publishes the images via `IMAGE_PATTERN` in
   `.github/workflows/builder.yaml`.
 - The legacy `home-assistant/builder` action is deprecated; the workflow uses the
-  composable actions (`actions/build-image`, `actions/publish-multi-arch-manifest`).
-  If you pin the legacy action instead, the image tag has to match the action ref
-  (only published up to `2026.03.2`).
+  composable action `home-assistant/builder/actions/build-image`. That action does
+  **not** need a pre-built builder image (the legacy action does, and only
+  `2026.03.2` was published).
+- All architectures are published into **one** GHCR package
+  (`ghcr.io/<owner>/addon-wled-matrix-manager`): the per-architecture images as
+  `<version>-<arch>`, the multi-arch manifest as `<version>` and `latest`. A
+  cross-package copy of the manifest is rejected by GHCR with `403 denied` when
+  using `GITHUB_TOKEN`.
+- The images are **not** signed with Cosign. The Cosign cache verification would
+  fail on every run with `no signatures found`, so `cosign: false` is set.
 - The add-on runs under **S6 overlay v3** (`/etc/s6-overlay/s6-rc.d`), not under the
   legacy `/etc/services.d` layout.
 - The backend virtual environment lives inside the workspace

@@ -4,7 +4,12 @@ env:
   # Image naming for the published images. The add-on config.yaml deliberately
   # has no "image:" field, so that the Supervisor builds the add-on locally
   # from the Dockerfile. The pattern is used here for the CI only.
-  IMAGE_PATTERN: "ghcr.io/${{ github.repository_owner }}/{arch}-addon-wled-matrix-manager"
+  #
+  # All architectures share ONE package: the per-architecture images are pushed
+  # as "<version>-<arch>", the multi-arch manifest is created from them in the
+  # same package. Publishing the manifest into a second package is not possible
+  # with GITHUB_TOKEN - GHCR denies the cross-package copy with "403 denied".
+  IMAGE_PATTERN: "ghcr.io/${{ github.repository_owner }}/addon-wled-matrix-manager"
   MONITORED_FILES: "config.json config.yaml config.yml Dockerfile rootfs"
 
 on:
@@ -121,15 +126,11 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}
         run: |
-          arch_image="${IMAGE_PATTERN//\{arch\}/${ARCH}}"
-          registry_prefix="${arch_image%/*}"
-          image_name="${arch_image##*/}"
-          image_name="${image_name//${ARCH}/}"
-          image_name="${image_name#-}"
-          image_name="${image_name%-}"
-          echo "arch_image=${arch_image}" >> "$GITHUB_OUTPUT"
+          registry_prefix="${IMAGE_PATTERN%/*}"
+          image_name="${IMAGE_PATTERN##*/}"
           echo "registry_prefix=${registry_prefix}" >> "$GITHUB_OUTPUT"
           echo "image_name=${image_name}" >> "$GITHUB_OUTPUT"
+          echo "image=${registry_prefix}/${image_name}" >> "$GITHUB_OUTPUT"
 
       - name: Build image
         uses: home-assistant/builder/actions/build-image@2026.09.0
@@ -137,11 +138,11 @@ jobs:
           arch: ${{ matrix.arch }}
           container-registry-password: ${{ secrets.GITHUB_TOKEN }}
           context: "./${{ matrix.addon }}"
-          image: ${{ steps.names.outputs.arch_image }}
+          image: ${{ steps.names.outputs.image }}
           image-tags: |
-            ${{ steps.meta.outputs.version }}
-          cache-image-tag: ${{ steps.meta.outputs.version }}
-          # The images are not signed with Cosign – the cache image verification
+            ${{ steps.meta.outputs.version }}-${{ matrix.arch }}
+          cache-image-tag: ${{ steps.meta.outputs.version }}-${{ matrix.arch }}
+          # The images are not signed with Cosign - the cache image verification
           # would only fail with "no signatures found" on every run.
           cosign: false
           labels: |
@@ -195,23 +196,34 @@ jobs:
         env:
           ARCH: "amd64"
         run: |
-          arch_image="${IMAGE_PATTERN//\{arch\}/${ARCH}}"
-          registry_prefix="${arch_image%/*}"
-          image_name="${arch_image##*/}"
-          image_name="${image_name//${ARCH}/}"
-          image_name="${image_name#-}"
-          image_name="${image_name%-}"
+          registry_prefix="${IMAGE_PATTERN%/*}"
+          image_name="${IMAGE_PATTERN##*/}"
           echo "registry_prefix=${registry_prefix}" >> "$GITHUB_OUTPUT"
           echo "image_name=${image_name}" >> "$GITHUB_OUTPUT"
+          echo "image=${registry_prefix}/${image_name}" >> "$GITHUB_OUTPUT"
 
       - name: Publish multi-arch manifest
-        uses: home-assistant/builder/actions/publish-multi-arch-manifest@2026.09.0
-        with:
-          architectures: ${{ steps.info.outputs.architectures }}
-          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
-          image-name: ${{ steps.names.outputs.image_name }}
-          image-tags: |
-            ${{ steps.meta.outputs.version }}
-            latest
-          cosign: false
-          registry-prefix: ${{ steps.names.outputs.registry_prefix }}
+        shell: bash
+        env:
+          IMAGE: ${{ steps.names.outputs.image }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          ARCHITECTURES: ${{ steps.info.outputs.architectures }}
+        run: |
+          set -euo pipefail
+          # The manifest is created in the same package as the per-architecture
+          # images ("<version>-<arch>"), because a cross-package copy is denied
+          # by GHCR for the GITHUB_TOKEN.
+          sources=()
+          while IFS= read -r arch; do
+            [[ -n "$arch" ]] && sources+=("${IMAGE}:${VERSION}-${arch}")
+          done < <(jq -r '.[]' <<< "${ARCHITECTURES}")
+
+          if [[ ${#sources[@]} -eq 0 ]]; then
+            echo "::error::No architectures found"
+            exit 1
+          fi
+
+          docker buildx imagetools create \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:latest" \
+            "${sources[@]}"

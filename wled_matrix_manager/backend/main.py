@@ -12,6 +12,9 @@ from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException
+from starlette.responses import Response
+from starlette.types import Scope
 
 from app.database import init_db
 from app.ha_client import get_ha_client
@@ -130,8 +133,52 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # Serve frontend static files (must be last — catches all unmatched routes)
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+
+
+class SPAStaticFiles(StaticFiles):
+    """Static files of the single-page application.
+
+    * ``index.html`` is never cached. It references the hashed asset files,
+      which change with every release. A cached ``index.html`` makes the
+      browser request asset files that no longer exist after an update,
+      which breaks the UI with 404 errors.
+    * The asset files are cached immutably, their name contains a content hash.
+    * Unknown paths without a file extension fall back to ``index.html``,
+      so that client-side routes (e.g. ``/scenes``) work on a page reload.
+    """
+
+    def file_response(
+        self,
+        full_path,
+        stat_result,
+        scope: Scope,
+        status_code: int = 200,
+    ) -> Response:
+        response = super().file_response(full_path, stat_result, scope, status_code)
+        if str(full_path).endswith("index.html"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        else:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        try:
+            return await super().get_response(path, scope)
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            filename = path.rsplit("/", 1)[-1]
+            if "." in filename or path.startswith(("api/", "ws/")):
+                # Missing file (e.g. an outdated asset) or an API route.
+                raise
+            # Client-side routing: the SPA handles the route.
+            return await super().get_response("index.html", scope)
+
+
 if frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
+    app.mount("/", SPAStaticFiles(directory=str(frontend_dist), html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
